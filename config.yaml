@@ -1,0 +1,28 @@
+simulation:
+  n_records: 7500
+  conciliation_rate: 0.70
+  random_seed: 42
+
+scenarios:
+  exact:
+    date_tolerance_days: 0
+    value_tolerance_pct: 0.0
+    n_classes: 2
+  fuzzy:
+    date_tolerance_days: 5
+    value_tolerance_pct: 2.0
+    n_classes: 3
+
+models:
+  random_forest:
+    n_estimators: 200
+    class_weight: balanced_subsample
+  svm:
+    kernel: rbf
+    class_weight: balanced
+  logistic_regression:
+    penalty: l2
+    class_weight: balanced
+  cv_folds: 5
+  scoring: f1_macro
+  test_size: 0.20
