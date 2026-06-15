@@ -62,3 +62,17 @@ def test_write_xml_contains_cnpj(sample_pagamentos, tmp_path):
     ns = {"ns": NS}
     cnpjs = tree.xpath("//ns:PrestadorServico//ns:Cnpj/text()", namespaces=ns)
     assert len(cnpjs) == len(sample_pagamentos)
+
+
+def test_generate_nfse_injects_mismatches(sample_pagamentos):
+    # With conciliation_rate=0.0, ALL records should be mismatched
+    # so no NFS-e CNPJ should match its source payment CNPJ
+    df = generate_nfse(sample_pagamentos, conciliation_rate=0.0, seed=42)
+    # date_shift and value_discrepancy mismatches keep the same CNPJ but change
+    # date or value, so we only check that NOT ALL CNPJs match their source
+    payment_cnpjs = sample_pagamentos["cnpj_fornecedor"].tolist()
+    nfse_cnpjs = df["nfse_cnpj_prestador"].tolist()
+    # At least some records should have different CNPJ (cnpj_error or ghost mismatches)
+    # With seed=42 and 10 records, statistical probability of zero CNPJ mismatches is negligible
+    matches = sum(p == n for p, n in zip(payment_cnpjs, nfse_cnpjs))
+    assert matches < len(sample_pagamentos), "Expected some CNPJ mismatches with conciliation_rate=0.0"
