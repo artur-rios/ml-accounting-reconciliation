@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -34,11 +33,14 @@ def build_features(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     desc_nfse = df["nfse_discriminacao"].fillna("").astype(str).tolist()
     all_texts = desc_pag + desc_nfse
 
-    vectorizer = TfidfVectorizer(min_df=1)
-    tfidf = vectorizer.fit_transform(all_texts)
-    n = len(df)
-    similarities = cosine_similarity(tfidf[:n], tfidf[n:]).diagonal()
-    feat["descricao_similarity"] = similarities
+    try:
+        vectorizer = TfidfVectorizer(min_df=1)
+        tfidf = vectorizer.fit_transform(all_texts)
+        n = len(df)
+        similarities = cosine_similarity(tfidf[:n], tfidf[n:]).diagonal()
+        feat["descricao_similarity"] = similarities
+    except ValueError:
+        feat["descricao_similarity"] = 0.0
 
     # Extract labels
     y = df["label"].fillna(0).astype(int).reset_index(drop=True)
