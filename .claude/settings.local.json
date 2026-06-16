@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Force)",
+      "PowerShell(pip install -e \".[dev]\" 2>&1)",
+      "PowerShell(pip list)",
+      "PowerShell(grep -E \"reconciliacao|pandas|pytest\")",
+      "PowerShell(pytest --collect-only 2>&1)",
+      "PowerShell(git add pyproject.toml config.yaml src/ tests/ notebooks/)",
+      "PowerShell(git commit -m \"chore: project scaffolding - package structure and config\")",
+      "PowerShell(pytest --collect-only -q 2>&1)",
+      "PowerShell(Get-ChildItem 'D:\\\\Repositories\\\\mba-tcc\\\\src\\\\reconciliacao' -Recurse -File | Select-Object FullName | ForEach-Object {$_.FullName -replace 'D:', ''} | Sort-Object)",
+      "PowerShell(Get-ChildItem 'D:\\\\Repositories\\\\mba-tcc\\\\tests' -Recurse -File | Select-Object FullName | ForEach-Object {$_.FullName -replace 'D:', ''} | Sort-Object)",
+      "Bash(python -m pytest tests/test_utils/test_config.py -v)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(python -m pytest tests/test_utils/test_cnpj.py -v)"
+    ]
+  }
+}

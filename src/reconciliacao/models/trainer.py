@@ -2,6 +2,7 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
@@ -28,20 +29,22 @@ def get_pipelines(cfg: dict) -> dict[str, tuple]:
         "svm": (
             Pipeline([
                 ("scaler", StandardScaler()),
-                ("clf", SVC(
-                    kernel=mcfg["svm"]["kernel"],
-                    class_weight=mcfg["svm"]["class_weight"],
-                    probability=True,
-                    random_state=seed,
+                ("clf", CalibratedClassifierCV(
+                    SVC(
+                        kernel=mcfg["svm"]["kernel"],
+                        class_weight=mcfg["svm"]["class_weight"],
+                        random_state=seed,
+                    ),
+                    ensemble=False,
                 )),
             ]),
-            {"clf__C": [0.1, 1.0, 10.0]},
+            {"clf__estimator__C": [0.1, 1.0, 10.0]},
         ),
         "logistic_regression": (
             Pipeline([
                 ("scaler", StandardScaler()),
                 ("clf", LogisticRegression(
-                    penalty=mcfg["logistic_regression"]["penalty"],
+                    l1_ratio=mcfg["logistic_regression"]["l1_ratio"],
                     class_weight=mcfg["logistic_regression"]["class_weight"],
                     max_iter=1000,
                     random_state=seed,

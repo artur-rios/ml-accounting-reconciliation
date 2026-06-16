@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import matplotlib
-matplotlib.use("Agg")  # non-interactive backend for file output
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.metrics import (

@@ -21,7 +21,7 @@ models:
     kernel: rbf
     class_weight: balanced
   logistic_regression:
-    penalty: l2
+    l1_ratio: 0
     class_weight: balanced
   cv_folds: 5
   scoring: f1_macro
