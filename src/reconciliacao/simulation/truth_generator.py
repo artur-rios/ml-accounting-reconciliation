@@ -52,6 +52,26 @@ def _illegitimate_retention(
     return 17.3
 
 
+def _shifted_term(rng: random.Random, prazo: int, shift_range: list[int]) -> int:
+    """Draw a payment term that differs from the supplier's own, clamped at zero.
+
+    Both true pairs and negatives call this with the same ``shift_range``, so
+    the *set* of atypical delta_dias values is identical between classes --
+    only how *often* each class uses it differs. That keeps desvio_prazo_fornecedor
+    informative without making any single delta_dias value class-unique, which a
+    deep model could otherwise memorise.
+
+    Redraws when clamping collapses the result back onto ``prazo`` (e.g. a
+    supplier whose own term is already 0 and the draw is non-positive) --
+    otherwise the configured atypical rate would silently under-deliver for
+    those suppliers.
+    """
+    novo = prazo
+    while novo == prazo:
+        novo = max(0, prazo + rng.randint(shift_range[0], shift_range[1]))
+    return novo
+
+
 def generate_comparison_dataset(
     cmp_cfg: dict, seed: int
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -98,8 +118,8 @@ def generate_comparison_dataset(
     pagamentos, notas, verdade = [], [], []
 
     for i, cnpj in enumerate(cnpjs):
-        valor_servicos = round(rng.uniform(500.0, 50_000.0), 2)
-        aliquota = round(rng.uniform(2.0, 5.0), 2)
+        valor_servicos = round(rng.uniform(*cmp_cfg["invoice_value_range_brl"]), 2)
+        aliquota = round(rng.uniform(*cmp_cfg["iss_rate_range_pct"]), 2)
         emissao = fake.date_between(start_date="-1y", end_date="-2m")
         discriminacao = fake.bs()
         numero = f"{i + 1:06d}"
@@ -132,8 +152,11 @@ def generate_comparison_dataset(
             retencao = combos[rng.choice(list(combos))]
             prazo = prazo_fornecedor[cnpj]
             if rng.random() < cmp_cfg["atypical_term_rate"]:
-                prazo = max(0, prazo + rng.choice([-10, -5, 7, 14, 21]))
-            descricao = _corrupt_text(discriminacao, rng)
+                prazo = _shifted_term(rng, prazo, cmp_cfg["term_shift_range"])
+            if rng.random() < cmp_cfg["atypical_description_rate"]:
+                descricao = fake.bs()
+            else:
+                descricao = _corrupt_text(discriminacao, rng)
             if rng.random() < cmp_cfg["same_municipality_rate"]:
                 centro = rng.choice(no_municipio)
             else:
@@ -150,7 +173,7 @@ def generate_comparison_dataset(
             dimensoes = rng.sample(["prazo", "texto", "municipio"], k=rng.randint(1, 3))
             prazo = prazo_fornecedor[cnpj]
             if "prazo" in dimensoes:
-                prazo = max(0, prazo + rng.choice([-30, -20, 25, 40, 60]))
+                prazo = _shifted_term(rng, prazo, cmp_cfg["term_shift_range"])
             descricao = fake.bs() if "texto" in dimensoes else _corrupt_text(discriminacao, rng)
             centro = rng.choice(centros) if "municipio" in dimensoes else rng.choice(no_municipio)
             tipo_negativo = "hard" if hard else "soft"
