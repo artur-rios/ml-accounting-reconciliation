@@ -190,10 +190,15 @@ o critério de recall de exceção, que exige uma classe de exceção bem defini
 | `compat_combo_iss` | retenção implícita ≈ `1,50 + aliquota` ou `6,15 + aliquota` |
 | `compat_inss` | retenção implícita ≈ 11,00 |
 | `acima_limite_csrf` | `valor_servicos > csrf_threshold_brl` |
-| `iss_declarado_consistente` | `valor_iss ≈ valor_servicos × aliquota / 100` |
+| `valor_retido_brl` | `valor_servicos − valor_pago`, em reais |
 | `desvio_prazo_fornecedor` | `delta_dias − prazo mediano histórico do fornecedor` |
 | `similaridade_descricao` | cosseno TF-IDF entre descrição e discriminação |
 | `mesmo_municipio` | código IBGE do município da nota igual ao do tomador |
+
+> **Revisão de 2026-09-10.** `iss_declarado_consistente` foi removida durante o planejamento: era uma
+> propriedade interna da nota, não do par pagamento↔nota, e portanto não carregaria sinal sobre a
+> genuinidade do pareamento. Entrou no lugar `valor_retido_brl`, evidência de nível de par que preserva
+> a interação com o limite de R$ 5.000 da CSRF.
 
 O gerador atual não emite município do tomador — apenas `nfse_codigo_municipio` do prestador
 (`xml_generator.py:15`). O `truth_generator` passa a atribuir um município ao tomador (a empresa
