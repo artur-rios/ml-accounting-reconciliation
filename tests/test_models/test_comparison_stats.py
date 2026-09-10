@@ -60,3 +60,34 @@ def test_holm_correction_is_no_smaller_than_the_raw_p():
     out = paired_comparisons(df, metric="recall_excecao")
     assert (out["p_holm"] >= out["p_value"] - 1e-12).all()
     assert (out["p_holm"] <= 1.0).all()
+
+
+def test_raises_on_missing_seed_algorithm_combination():
+    """Missing (seed, algorithm) cells after pivot must raise ValueError naming the missing data."""
+    # Create a DataFrame with missing data: logistic_regression has no seed 5
+    df = _per_seed({
+        "random_forest": [0.80, 0.81, 0.79, 0.82, 0.80, 0.83, 0.78, 0.81, 0.80, 0.82],
+        "svm": [0.70, 0.71, 0.69, 0.72, 0.70, 0.73, 0.68, 0.71, 0.70, 0.72],
+        "logistic_regression": [0.60, 0.61, 0.59, 0.62, 0.60],  # Only 5 seeds, not 10
+    })
+    with pytest.raises(ValueError) as exc_info:
+        paired_comparisons(df, metric="recall_excecao")
+
+    # Verify error message names the offending algorithm and seed
+    error_msg = str(exc_info.value)
+    assert "Missing (seed, algorithm) combinations" in error_msg
+    assert "logistic_regression" in error_msg
+    assert "seed=" in error_msg
+
+
+def test_complete_frame_does_not_raise():
+    """A complete (seed, algorithm) frame with no missing cells must not raise."""
+    df = _per_seed({
+        "random_forest": [0.80, 0.81, 0.79, 0.82, 0.80, 0.83, 0.78, 0.81, 0.80, 0.82],
+        "svm": [0.70, 0.71, 0.69, 0.72, 0.70, 0.73, 0.68, 0.71, 0.70, 0.72],
+        "logistic_regression": [0.60, 0.61, 0.59, 0.62, 0.60, 0.63, 0.58, 0.61, 0.60, 0.62],
+    })
+    # This must not raise — every seed has a value for every algorithm
+    out = paired_comparisons(df, metric="recall_excecao")
+    assert len(out) == 3
+    assert not out.isnull().any().any()

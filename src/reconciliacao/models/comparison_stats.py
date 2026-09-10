@@ -32,6 +32,28 @@ def paired_comparisons(per_seed: pd.DataFrame, metric: str) -> pd.DataFrame:
     wide = per_seed.pivot(index="seed", columns="algorithm", values=metric)
     algorithms = sorted(wide.columns)
 
+    # Validate that no (seed, algorithm) combinations are missing
+    missing_mask = wide.isna()
+    if missing_mask.any().any():
+        # Collect missing cells: (algorithm, seed) pairs
+        missing_cells = []
+        for algo in wide.columns:
+            for seed in wide.index:
+                if pd.isna(wide.loc[seed, algo]):
+                    missing_cells.append((algo, seed))
+
+        # Cap enumeration at a handful, provide total count if longer
+        max_show = 5
+        shown = missing_cells[:max_show]
+        msg_lines = ["Missing (seed, algorithm) combinations after pivot:"]
+        for algo, seed in shown:
+            msg_lines.append(f"  algorithm={algo}, seed={seed}")
+
+        if len(missing_cells) > max_show:
+            msg_lines.append(f"  ... and {len(missing_cells) - max_show} more (total: {len(missing_cells)})")
+
+        raise ValueError("\n".join(msg_lines))
+
     rows, raw_p_values = [], []
     for a, b in combinations(algorithms, 2):
         diff = wide[a] - wide[b]
