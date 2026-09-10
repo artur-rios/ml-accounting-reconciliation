@@ -462,10 +462,15 @@ def _corrupt_text(texto: str, rng: random.Random) -> str:
 def _illegitimate_retention(
     rng: random.Random, combos: dict[str, float], tol_pp: float
 ) -> float:
-    """A withholding percentage that is clearly outside every legal band."""
+    """A withholding percentage that is clearly outside every legal band.
+
+    The margin is 6x the tolerance, not 1x: valor_pago is rounded to cents
+    afterwards, which shifts the effective percentage slightly, and a margin
+    equal to the tolerance the tests assert against would make them flaky.
+    """
     for _ in range(200):
         candidato = rng.uniform(0.0, 20.0)
-        if all(abs(candidato - v) > tol_pp * 3 for v in combos.values()):
+        if all(abs(candidato - v) > tol_pp * 6 for v in combos.values()):
             return candidato
     return 17.3
 
