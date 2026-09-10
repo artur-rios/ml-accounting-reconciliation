@@ -82,6 +82,7 @@ def comparison_config():
         "n_seeds": 2,
         "n_records": 400,
         "match_rate": 0.70,
+        "payments_per_supplier": 5,
         "hard_negative_rate": 0.30,
         "atypical_term_rate": 0.10,
         "term_shift_range": [-30, 60],

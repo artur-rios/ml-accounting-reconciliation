@@ -71,8 +71,13 @@ def run_seed(cfg: dict, seed: int) -> tuple[list[dict], pd.Series, dict[str, tup
 
     rows, curves = [], {}
     for name, model in models.items():
-        proba_val = model.predict_proba(X_val)[:, 0]
-        proba_test = model.predict_proba(X_te)[:, 0]
+        # predict_proba's column order follows classes_, not a fixed [0, 1]
+        # position -- it is only [0, 1] because integer labels happen to sort
+        # that way. Look the exception column (label 0) up explicitly rather
+        # than assume it sits at index 0.
+        col_excecao = list(model.classes_).index(0)
+        proba_val = model.predict_proba(X_val)[:, col_excecao]
+        proba_test = model.predict_proba(X_te)[:, col_excecao]
         curves[name] = ((y_te.to_numpy() == 0).astype(int), proba_test)
 
         threshold = choose_threshold(y_val, proba_val, cmp_cfg["min_precision"])
@@ -80,12 +85,18 @@ def run_seed(cfg: dict, seed: int) -> tuple[list[dict], pd.Series, dict[str, tup
             # pr_auc_excecao is threshold-free (a ranking metric over the full
             # score, not a decision at a cut point), so it is still computable
             # here even though no operating point meets the precision floor.
+            # precisao_excecao / taxa_encaminhamento have no threshold to be
+            # computed at, so they are NaN here, not a synthetic 0.0 -- a
+            # summary mean must not read "could not reach the precision
+            # floor" as "reached it, imprecisely". recall_excecao stays 0.0:
+            # that zero is a deliberate conservative convention for the
+            # primary metric, which must stay non-NaN.
             is_exception_test = (y_te.to_numpy() == 0).astype(int)
             pr_auc = float(average_precision_score(is_exception_test, proba_test))
             rows.append({
                 "seed": seed, "algorithm": name, "threshold": None,
                 "precisao_validacao": None, "recall_excecao": 0.0,
-                "precisao_excecao": 0.0, "taxa_encaminhamento": 0.0,
+                "precisao_excecao": float("nan"), "taxa_encaminhamento": float("nan"),
                 "pr_auc_excecao": pr_auc, "f1_macro": float("nan"),
             })
             continue

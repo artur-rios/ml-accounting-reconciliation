@@ -19,6 +19,7 @@ def _fixtures_with_third_row():
         "descricao": ["consultoria", "manutencao", "auditoria"],
         "centro_custo": ["CC-101", "CC-102", "CC-103"],
         "municipio_centro_custo": ["3550308", "3550308", "3550308"],
+        "nfse_numero_candidata": ["000001", "000002", "NF-2026-A"],
     })
     nfse = pd.DataFrame({
         "nfse_numero": ["000001", "000002", "NF-2026-A"],
@@ -50,6 +51,7 @@ def _fixtures():
         "descricao": ["consultoria", "manutencao"],
         "centro_custo": ["CC-101", "CC-102"],
         "municipio_centro_custo": ["3550308", "3550308"],
+        "nfse_numero_candidata": ["000001", "000002"],
     })
     nfse = pd.DataFrame({
         "nfse_numero": ["000001", "000002"],
@@ -149,7 +151,9 @@ def test_true_pair_survives_real_csv_round_trip(tmp_path):
     verdade_roundtrip = pd.read_csv(verdade_path)
 
     # Confirm the round-trip actually changed the dtypes -- otherwise this
-    # test would not exercise the defect at all.
+    # test would not exercise the defect at all. nfse_numero_candidata is the
+    # join key now, so it is just as exposed to this as nfse_numero is.
+    assert pag_roundtrip["nfse_numero_candidata"].dtype != object
     assert nfse_roundtrip["nfse_numero"].dtype != object
     assert verdade_roundtrip["nfse_numero"].dtype != object
 
@@ -218,8 +222,14 @@ def test_large_invoice_numbers_are_not_collapsed_by_float_precision():
     must not be swept into a false match against the truth value.
     """
     pag, nfse = _fixtures()
+    pag = pag.copy()
     nfse = nfse.copy()
     nfse.loc[nfse["nfse_cnpj_prestador"] == "44555666000195", "nfse_numero"] = (
+        "100000000000000002"
+    )
+    # The payment's candidate reference must point at the invoice it was
+    # actually built against, same as the generator would produce.
+    pag.loc[pag["id_pagamento"] == "PAG-000002", "nfse_numero_candidata"] = (
         "100000000000000002"
     )
     verdade = pd.DataFrame({
@@ -230,3 +240,47 @@ def test_large_invoice_numbers_are_not_collapsed_by_float_precision():
 
     out = label_from_truth(pag, nfse, verdade)
     assert out.loc[out["id_pagamento"] == "PAG-000002", "label"].iloc[0] == 0
+
+
+def test_shared_supplier_still_yields_one_row_per_payment():
+    """A supplier with several invoices must not multiply rows.
+
+    Joining on cnpj_fornecedor (the old approach) would produce a cross
+    product once a supplier has more than one invoice; joining on the
+    explicit nfse_numero_candidata reference must not.
+    """
+    cnpj = "11222333000181"
+    pag = pd.DataFrame({
+        "id_pagamento": ["PAG-000001", "PAG-000002", "PAG-000003"],
+        "cnpj_fornecedor": [cnpj, cnpj, cnpj],
+        "data_pagamento": pd.to_datetime(["2026-01-15", "2026-02-10", "2026-03-05"]),
+        "valor_pago": [1000.00, 2500.00, 750.00],
+        "descricao": ["consultoria", "manutencao", "auditoria"],
+        "centro_custo": ["CC-101", "CC-102", "CC-103"],
+        "municipio_centro_custo": ["3550308", "3550308", "3550308"],
+        "nfse_numero_candidata": ["000001", "000002", "000003"],
+    })
+    nfse = pd.DataFrame({
+        "nfse_numero": ["000001", "000002", "000003"],
+        "nfse_cnpj_prestador": [cnpj, cnpj, cnpj],
+        "nfse_data_emissao": [
+            "2026-01-15T00:00:00", "2026-02-10T00:00:00", "2026-03-05T00:00:00",
+        ],
+        "nfse_valor_servicos": [1000.00, 2500.00, 750.00],
+        "nfse_valor_iss": [50.00, 125.00, 37.50],
+        "nfse_aliquota": [5.00, 5.00, 5.00],
+        "nfse_discriminacao": ["consultoria", "manutencao", "auditoria"],
+        "nfse_codigo_municipio": ["3550308", "3550308", "3550308"],
+    })
+    verdade = pd.DataFrame({
+        "id_pagamento": ["PAG-000001", "PAG-000002", "PAG-000003"],
+        "nfse_numero": ["000001", "", "000003"],
+        "tipo_negativo": ["", "hard", ""],
+    })
+
+    out = label_from_truth(pag, nfse, verdade)
+    assert len(out) == 3
+    assert out["id_pagamento"].is_unique
+    assert out.set_index("id_pagamento")["label"].to_dict() == {
+        "PAG-000001": 1, "PAG-000002": 0, "PAG-000003": 1,
+    }

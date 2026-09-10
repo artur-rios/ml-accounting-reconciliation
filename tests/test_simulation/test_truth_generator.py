@@ -14,6 +14,22 @@ def test_truth_table_has_one_row_per_payment(comparison_config):
     assert set(verdade["id_pagamento"]) == set(pag["id_pagamento"])
 
 
+def test_suppliers_have_a_real_payment_history(comparison_config):
+    """A supplier pool smaller than n_records means several payments per
+    supplier -- the regression test for the CNPJ-per-payment defect that
+    zeroed desvio_prazo_fornecedor on every training row."""
+    pag, _, _ = generate_comparison_dataset(comparison_config, seed=42)
+    counts = pag["cnpj_fornecedor"].value_counts()
+
+    n_records = comparison_config["n_records"]
+    payments_per_supplier = comparison_config["payments_per_supplier"]
+    expected_suppliers = max(1, n_records // payments_per_supplier)
+
+    assert len(counts) == expected_suppliers
+    assert counts.max() > 1
+    assert counts.mean() == pytest.approx(payments_per_supplier, abs=1)
+
+
 def test_match_rate_is_respected(comparison_config):
     _, _, verdade = generate_comparison_dataset(comparison_config, seed=42)
     matched = (verdade["nfse_numero"] != "").sum()
@@ -32,7 +48,7 @@ def test_hard_negatives_have_a_legitimate_value_ratio(comparison_config):
     """A hard negative is precisely one the value ratio cannot resolve."""
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
     merged = pag.merge(
-        nfse, left_on="cnpj_fornecedor", right_on="nfse_cnpj_prestador"
+        nfse, left_on="nfse_numero_candidata", right_on="nfse_numero"
     ).merge(verdade, on="id_pagamento", suffixes=("", "_verdade"))
     hard = merged[merged["tipo_negativo"] == "hard"]
     assert len(hard) > 0
@@ -50,7 +66,7 @@ def test_hard_negatives_have_a_legitimate_value_ratio(comparison_config):
 def test_soft_negatives_have_an_illegitimate_value_ratio(comparison_config):
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
     merged = pag.merge(
-        nfse, left_on="cnpj_fornecedor", right_on="nfse_cnpj_prestador"
+        nfse, left_on="nfse_numero_candidata", right_on="nfse_numero"
     ).merge(verdade, on="id_pagamento", suffixes=("", "_verdade"))
     soft = merged[merged["tipo_negativo"] == "soft"]
     assert len(soft) > 0
@@ -71,7 +87,7 @@ def test_soft_negatives_have_an_illegitimate_value_ratio(comparison_config):
 def test_true_pairs_sometimes_break_the_supplier_term(comparison_config):
     """No evidence dimension may separate the classes on its own."""
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
-    merged = pag.merge(nfse, left_on="cnpj_fornecedor", right_on="nfse_cnpj_prestador").merge(
+    merged = pag.merge(nfse, left_on="nfse_numero_candidata", right_on="nfse_numero").merge(
         verdade, on="id_pagamento", suffixes=("", "_verdade")
     )
     matched = merged[merged["nfse_numero_verdade"] != ""]
@@ -85,7 +101,7 @@ def test_true_pairs_sometimes_break_the_supplier_term(comparison_config):
 def test_true_pairs_sometimes_sit_in_a_different_municipality(comparison_config):
     """No evidence dimension may separate the classes on its own (municipio)."""
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
-    merged = pag.merge(nfse, left_on="cnpj_fornecedor", right_on="nfse_cnpj_prestador").merge(
+    merged = pag.merge(nfse, left_on="nfse_numero_candidata", right_on="nfse_numero").merge(
         verdade, on="id_pagamento", suffixes=("", "_verdade")
     )
     matched = merged[merged["nfse_numero_verdade"] != ""]
@@ -106,7 +122,7 @@ def _tokens(texto: str) -> set[str]:
 def test_true_pairs_sometimes_carry_an_unrelated_description(comparison_config):
     """Guards F1: description must not be a perfect predictor of the label."""
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
-    merged = pag.merge(nfse, left_on="cnpj_fornecedor", right_on="nfse_cnpj_prestador").merge(
+    merged = pag.merge(nfse, left_on="nfse_numero_candidata", right_on="nfse_numero").merge(
         verdade, on="id_pagamento", suffixes=("", "_verdade")
     )
     matched = merged[merged["nfse_numero_verdade"] != ""]
@@ -123,7 +139,7 @@ def test_negatives_corrupt_a_varying_subset_of_dimensions(comparison_config):
     not sit fixed on a single dimension (e.g. always just "texto").
     """
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
-    merged = pag.merge(nfse, left_on="cnpj_fornecedor", right_on="nfse_cnpj_prestador").merge(
+    merged = pag.merge(nfse, left_on="nfse_numero_candidata", right_on="nfse_numero").merge(
         verdade, on="id_pagamento", suffixes=("", "_verdade")
     )
     negatives = merged[merged["nfse_numero_verdade"] == ""]
@@ -151,7 +167,7 @@ def test_delta_days_overlap_between_classes(comparison_config):
     shift_range, so delta_dias must not split into class-exclusive values.
     """
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
-    merged = pag.merge(nfse, left_on="cnpj_fornecedor", right_on="nfse_cnpj_prestador").merge(
+    merged = pag.merge(nfse, left_on="nfse_numero_candidata", right_on="nfse_numero").merge(
         verdade, on="id_pagamento", suffixes=("", "_verdade")
     )
     delta = (

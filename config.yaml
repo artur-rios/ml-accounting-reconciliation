@@ -31,6 +31,7 @@ comparison:
   n_seeds: 10
   n_records: 7500
   match_rate: 0.70              # fração de pagamentos com par verdadeiro
+  payments_per_supplier: 5      # pagamentos por fornecedor; define o tamanho do pool de CNPJs
   hard_negative_rate: 0.30      # fração DOS NÃO-PARES que são hard negatives (não do total)
   atypical_term_rate: 0.10      # fração dos pares verdadeiros que fogem do prazo do fornecedor
   term_shift_range: [-30, 60]          # deslocamento de prazo, em dias, para prazos atípicos

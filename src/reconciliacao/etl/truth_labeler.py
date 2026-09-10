@@ -63,23 +63,34 @@ def label_from_truth(
 ) -> pd.DataFrame:
     """Join payment to its candidate invoice and label the pairing.
 
+    A supplier may have several invoices, so the candidate can no longer be
+    found by joining on ``cnpj_fornecedor``: that would multiply rows, one
+    per invoice the supplier has. Instead each payment names its candidate
+    invoice explicitly in ``nfse_numero_candidata``, and the join keys off
+    that against ``nfse_numero``. Both sides are canonicalised the same way
+    the label comparison already is -- a CSV round-trip can turn one side
+    into ``int64`` and the other into ``float64``, and an un-normalised join
+    key would silently drop every row instead of merely mislabeling it.
+
     Every payment keeps exactly one candidate invoice, provided the caller's
-    data contract holds: each ``cnpj_fornecedor`` maps to exactly one
-    ``nfse_cnpj_prestador`` row in ``df_nfse``. The inner join below does not
-    enforce that -- a CNPJ with no invoice is silently dropped, and one with
-    multiple invoices would multiply rows -- it relies on the generator's
-    guarantee of one invoice per supplier.
+    data contract holds: each ``nfse_numero_candidata`` maps to exactly one
+    ``nfse_numero`` row in ``df_nfse``. The inner join below does not enforce
+    that -- a candidate with no matching invoice is silently dropped, and one
+    matching several invoices would multiply rows -- it relies on the
+    generator's guarantee of one invoice per candidate reference.
 
     Label 1 when the candidate invoice is the one the truth table records,
     0 otherwise. tipo_negativo is dropped: it is diagnostic metadata, never a
     feature.
     """
-    merged = df_pag.merge(
-        df_nfse,
-        left_on="cnpj_fornecedor",
-        right_on="nfse_cnpj_prestador",
+    chave_pag = _normalize_numero(df_pag["nfse_numero_candidata"]).rename("_chave_candidata")
+    chave_nfse = _normalize_numero(df_nfse["nfse_numero"]).rename("_chave_candidata")
+
+    merged = pd.concat([df_pag, chave_pag], axis=1).merge(
+        pd.concat([df_nfse, chave_nfse], axis=1),
+        on="_chave_candidata",
         how="inner",
-    )
+    ).drop(columns=["_chave_candidata"])
 
     truth = df_verdade[["id_pagamento", "nfse_numero"]].rename(
         columns={"nfse_numero": "nfse_verdadeira"}

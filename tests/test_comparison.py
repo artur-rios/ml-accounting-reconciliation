@@ -1,12 +1,17 @@
 import math
 
+import numpy as np
 import pandas as pd
 import pytest
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.dummy import DummyClassifier
 
 import reconciliacao.comparison as comparison_module
 from reconciliacao.comparison import run, run_seed
+from reconciliacao.etl.truth_labeler import label_from_truth
 from reconciliacao.models.comparison_stats import paired_comparisons
+from reconciliacao.models.features_v2 import build_features_v2, fit_supplier_terms
+from reconciliacao.simulation.truth_generator import generate_comparison_dataset
 
 
 @pytest.mark.integration
@@ -151,9 +156,9 @@ def test_run_seed_pins_partitions_supplier_terms_and_no_threshold_branch(
     assert len(no_threshold_rows) >= 1
     for row in no_threshold_rows:
         assert row["precisao_validacao"] is None
-        assert row["recall_excecao"] == 0.0
-        assert row["precisao_excecao"] == 0.0
-        assert row["taxa_encaminhamento"] == 0.0
+        assert row["recall_excecao"] == 0.0  # deliberate conservative convention, stays non-NaN
+        assert math.isnan(row["precisao_excecao"])  # no threshold to compute it at
+        assert math.isnan(row["taxa_encaminhamento"])  # no threshold to compute it at
         assert not math.isnan(row["pr_auc_excecao"])  # threshold-free, still computable (F2)
         assert math.isnan(row["f1_macro"])
 
@@ -162,3 +167,100 @@ def test_run_seed_pins_partitions_supplier_terms_and_no_threshold_branch(
     per_seed = pd.DataFrame(all_rows)
     wilcoxon = paired_comparisons(per_seed, metric="recall_excecao")
     assert len(wilcoxon) == 3  # 3 pairwise comparisons among the 3 algorithms
+
+
+class _RowScoreStub(ClassifierMixin, BaseEstimator):
+    """A fitted classifier stand-in whose probability estimate is a
+    deterministic function of the row's own feature values, and whose
+    classes_ order is configurable.
+
+    Two instances built with classes=(0, 1) and classes=(1, 0) represent the
+    identical underlying probability model wearing a different column
+    arrangement -- exactly what a real sklearn estimator's predict_proba
+    would never do (classes_ is always sorted ascending for {0, 1} integer
+    labels) but that run_seed must not silently assume. If run_seed reads
+    off the exception column (label 0) via classes_ rather than by position,
+    both instances must produce identical downstream metrics; the old
+    ``[:, 0]`` code would instead invert one of them.
+    """
+
+    def __init__(self, classes=(0, 1)):
+        self.classes = classes
+
+    def fit(self, X, y):
+        self.classes_ = np.array(self.classes)
+        return self
+
+    def predict_proba(self, X):
+        scores = np.abs(np.sin(X.to_numpy(dtype=float).sum(axis=1) * 12.9898)) % 1.0
+        proba_label0 = 1.0 - scores
+        proba_label1 = scores
+        if list(self.classes) == [0, 1]:
+            return np.column_stack([proba_label0, proba_label1])
+        return np.column_stack([proba_label1, proba_label0])  # classes_ == [1, 0]
+
+
+def _make_stub_fit_algorithms(classes):
+    def _stub(X_train, y_train, cfg, seed):
+        return {name: _RowScoreStub(classes=classes).fit(X_train, y_train) for name in _ALGORITHM_ORDER}
+    return _stub
+
+
+def test_exception_proba_is_read_via_classes_not_column_position(monkeypatch, sample_config, comparison_config):
+    """Regression test for the [:, 0] positional bug: predict_proba's column
+    order must be resolved through classes_, since it is only [0, 1] because
+    integer labels happen to sort that way."""
+    cfg = dict(sample_config)
+    comparison_config["n_records"] = 400
+    cfg["comparison"] = comparison_config
+
+    def run_with_classes(classes):
+        monkeypatch.setattr(comparison_module, "fit_algorithms", _make_stub_fit_algorithms(classes))
+        rows, _leak_report, _curves = run_seed(cfg, seed=0)
+        return pd.DataFrame(rows).sort_values("algorithm").reset_index(drop=True)
+
+    forward = run_with_classes((0, 1))
+    reversed_ = run_with_classes((1, 0))
+
+    for column in ["recall_excecao", "pr_auc_excecao"]:
+        assert forward[column].to_numpy() == pytest.approx(reversed_[column].to_numpy(), abs=1e-9), column
+
+
+def _built_features(comparison_config, seed=42):
+    """Run the real pipeline from raw generation through build_features_v2,
+    exactly as run_seed does, and return (X_train, X_test, pairs, test_df)."""
+    df_payments, df_invoices, df_truth = generate_comparison_dataset(comparison_config, seed)
+    pairs = label_from_truth(df_payments, df_invoices, df_truth)
+
+    train_df, val_df, test_df = comparison_module._split_three_ways(pairs, comparison_config, seed)
+    supplier_terms, global_term = fit_supplier_terms(train_df)
+
+    X_train, _y_train = build_features_v2(train_df, comparison_config, supplier_terms, global_term)
+    X_test, _y_test = build_features_v2(test_df, comparison_config, supplier_terms, global_term)
+    return X_train, X_test, train_df, test_df
+
+
+def test_desvio_prazo_fornecedor_has_variance_on_train(comparison_config):
+    """Regression test for the defect: one payment per supplier collapsed
+    the per-supplier median onto each row's own value, zeroing
+    desvio_prazo_fornecedor on every training row."""
+    X_train, _X_test, _train_df, _test_df = _built_features(comparison_config)
+    assert X_train["desvio_prazo_fornecedor"].nunique() > 1
+
+
+def test_no_feature_column_is_constant_on_train(comparison_config):
+    """Generalises the above across every column -- the test whose absence
+    let the defect through, and the one meant to catch the next one."""
+    X_train, _X_test, _train_df, _test_df = _built_features(comparison_config)
+    constant_columns = [c for c in X_train.columns if X_train[c].nunique() <= 1]
+    assert constant_columns == []
+
+
+def test_some_test_suppliers_are_also_present_in_train(comparison_config):
+    """With several invoices per supplier, a supplier can land in both the
+    train and test partitions, so the fitted median genuinely transfers
+    instead of every test row falling back to the global median."""
+    _X_train, _X_test, train_df, test_df = _built_features(comparison_config)
+    train_suppliers = set(train_df["cnpj_fornecedor"])
+    test_suppliers = set(test_df["cnpj_fornecedor"])
+    assert len(train_suppliers & test_suppliers) > 0

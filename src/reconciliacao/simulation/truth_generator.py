@@ -1,10 +1,18 @@
 # src/reconciliacao/simulation/truth_generator.py
 """Generate a reconciliation dataset whose label comes from ground truth.
 
-Every payment is paired with exactly one candidate invoice from the same
-supplier, and the truth table says whether that pairing is genuine. Labels
-therefore never derive from the observable deltas -- the decoupling is by
-construction, which is what the original experiment lacked.
+Every payment is paired with exactly one candidate invoice, referenced
+explicitly via ``nfse_numero_candidata``, and the truth table says whether
+that pairing is genuine. Labels therefore never derive from the observable
+deltas -- the decoupling is by construction, which is what the original
+experiment lacked.
+
+Suppliers are drawn from a fixed-size pool (``n_records // payments_per_supplier``
+CNPJs), each carrying one payment term and municipality, and several invoices
+are generated against each supplier. This gives ``desvio_prazo_fornecedor`` a
+real payment history to summarise: a single-invoice-per-supplier pool made the
+per-supplier median collapse onto each row's own value, which zeroed the
+feature on every training row.
 """
 
 import random
@@ -85,16 +93,23 @@ def generate_comparison_dataset(
     tolerance = config["retention_tolerance_pp"]
     csrf_threshold = config["csrf_threshold_brl"]
 
-    cnpjs: list[str] = []
+    n_suppliers = max(1, n // config["payments_per_supplier"])
+    supplier_cnpjs: list[str] = []
     seen: set[str] = set()
-    while len(seen) < n:
+    while len(seen) < n_suppliers:
         c = generate_cnpj(rng)
         if c not in seen:
             seen.add(c)
-            cnpjs.append(c)
+            supplier_cnpjs.append(c)
 
-    supplier_payment_terms = {c: rng.choice(config["payment_terms_days"]) for c in cnpjs}
-    supplier_municipality = {c: rng.choice(_MUNICIPIOS) for c in cnpjs}
+    supplier_payment_terms = {c: rng.choice(config["payment_terms_days"]) for c in supplier_cnpjs}
+    supplier_municipality = {c: rng.choice(_MUNICIPIOS) for c in supplier_cnpjs}
+
+    # Assign each invoice a supplier from the pool. Round-robin first so every
+    # supplier's count is within one of payments_per_supplier, then shuffle so
+    # invoice order does not correlate with supplier assignment.
+    supplier_assignment = [supplier_cnpjs[i % n_suppliers] for i in range(n)]
+    rng.shuffle(supplier_assignment)
 
     cost_centers = [f"CC-{i:03d}" for i in range(100, 200)]
     cost_center_municipality = {cc: rng.choice(_MUNICIPIOS) for cc in cost_centers}
@@ -117,7 +132,7 @@ def generate_comparison_dataset(
 
     payments, invoices, ground_truth = [], [], []
 
-    for i, cnpj in enumerate(cnpjs):
+    for i, cnpj in enumerate(supplier_assignment):
         service_value = round(rng.uniform(*config["invoice_value_range_brl"]), 2)
         tax_rate = round(rng.uniform(*config["iss_rate_range_pct"]), 2)
         issue_date = fake.date_between(start_date="-1y", end_date="-2m")
@@ -187,6 +202,7 @@ def generate_comparison_dataset(
             "descricao": payment_description,
             "centro_custo": cost_center,
             "municipio_centro_custo": cost_center_municipality[cost_center],
+            "nfse_numero_candidata": invoice_number,
         })
         ground_truth.append({
             "id_pagamento": f"PAG-{i + 1:06d}",
