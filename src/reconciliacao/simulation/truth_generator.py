@@ -21,23 +21,23 @@ _MUNICIPIOS = ["3550308", "3304557", "4106902", "2304400", "5300108"]
 _ACCENTS = str.maketrans("áàâãéêíóôõúüç", "aaaaeeiooouuc")
 
 
-def _corrupt_text(texto: str, rng: random.Random) -> str:
+def _corrupt_text(text: str, rng: random.Random) -> str:
     """Abbreviate, transpose characters and strip accents, as a payment memo would."""
     out = []
-    for palavra in texto.split():
+    for word in text.split():
         r = rng.random()
-        if r < 0.25 and len(palavra) > 4:
-            out.append(palavra[:3])
-        elif r < 0.40 and len(palavra) > 3:
-            i = rng.randrange(len(palavra) - 1)
-            out.append(palavra[:i] + palavra[i + 1] + palavra[i] + palavra[i + 2:])
+        if r < 0.25 and len(word) > 4:
+            out.append(word[:3])
+        elif r < 0.40 and len(word) > 3:
+            i = rng.randrange(len(word) - 1)
+            out.append(word[:i] + word[i + 1] + word[i] + word[i + 2:])
         else:
-            out.append(palavra)
+            out.append(word)
     return " ".join(out).translate(_ACCENTS)
 
 
 def _illegitimate_retention(
-    rng: random.Random, combos: dict[str, float], tol_pp: float
+    rng: random.Random, combinations: dict[str, float], tolerance_pp: float
 ) -> float:
     """A withholding percentage that is clearly outside every legal band.
 
@@ -46,13 +46,13 @@ def _illegitimate_retention(
     equal to the tolerance the tests assert against would make them flaky.
     """
     for _ in range(200):
-        candidato = rng.uniform(0.0, 20.0)
-        if all(abs(candidato - v) > tol_pp * 6 for v in combos.values()):
-            return candidato
+        candidate = rng.uniform(0.0, 20.0)
+        if all(abs(candidate - v) > tolerance_pp * 6 for v in combinations.values()):
+            return candidate
     return 17.3
 
 
-def _shifted_term(rng: random.Random, prazo: int, shift_range: list[int]) -> int:
+def _shifted_term(rng: random.Random, term: int, shift_range: list[int]) -> int:
     """Draw a payment term that differs from the supplier's own, clamped at zero.
 
     Both true pairs and negatives call this with the same ``shift_range``, so
@@ -61,137 +61,137 @@ def _shifted_term(rng: random.Random, prazo: int, shift_range: list[int]) -> int
     informative without making any single delta_dias value class-unique, which a
     deep model could otherwise memorise.
 
-    Redraws when clamping collapses the result back onto ``prazo`` (e.g. a
+    Redraws when clamping collapses the result back onto ``term`` (e.g. a
     supplier whose own term is already 0 and the draw is non-positive) --
     otherwise the configured atypical rate would silently under-deliver for
     those suppliers.
     """
-    novo = prazo
-    while novo == prazo:
-        novo = max(0, prazo + rng.randint(shift_range[0], shift_range[1]))
-    return novo
+    new_term = term
+    while new_term == term:
+        new_term = max(0, term + rng.randint(shift_range[0], shift_range[1]))
+    return new_term
 
 
 def generate_comparison_dataset(
-    cmp_cfg: dict, seed: int
+    config: dict, seed: int
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Return (df_pagamentos, df_nfse, df_verdade) for one seed."""
     rng = random.Random(seed)
     Faker.seed(seed)
     fake = Faker("pt_BR")
 
-    n = cmp_cfg["n_records"]
-    rates = cmp_cfg["retention_rates"]
-    tol = cmp_cfg["retention_tolerance_pp"]
-    limite_csrf = cmp_cfg["csrf_threshold_brl"]
+    n = config["n_records"]
+    rates = config["retention_rates"]
+    tolerance = config["retention_tolerance_pp"]
+    csrf_threshold = config["csrf_threshold_brl"]
 
     cnpjs: list[str] = []
-    vistos: set[str] = set()
-    while len(vistos) < n:
+    seen: set[str] = set()
+    while len(seen) < n:
         c = generate_cnpj(rng)
-        if c not in vistos:
-            vistos.add(c)
+        if c not in seen:
+            seen.add(c)
             cnpjs.append(c)
 
-    prazo_fornecedor = {c: rng.choice(cmp_cfg["payment_terms_days"]) for c in cnpjs}
-    municipio_fornecedor = {c: rng.choice(_MUNICIPIOS) for c in cnpjs}
+    supplier_payment_terms = {c: rng.choice(config["payment_terms_days"]) for c in cnpjs}
+    supplier_municipality = {c: rng.choice(_MUNICIPIOS) for c in cnpjs}
 
-    centros = [f"CC-{i:03d}" for i in range(100, 200)]
-    municipio_centro = {cc: rng.choice(_MUNICIPIOS) for cc in centros}
-    centros_por_municipio: dict[str, list[str]] = {}
-    for cc, m in municipio_centro.items():
-        centros_por_municipio.setdefault(m, []).append(cc)
+    cost_centers = [f"CC-{i:03d}" for i in range(100, 200)]
+    cost_center_municipality = {cc: rng.choice(_MUNICIPIOS) for cc in cost_centers}
+    cost_centers_by_municipality: dict[str, list[str]] = {}
+    for cc, m in cost_center_municipality.items():
+        cost_centers_by_municipality.setdefault(m, []).append(cc)
 
-    n_match = int(n * cmp_cfg["match_rate"])
-    eh_par = [True] * n_match + [False] * (n - n_match)
-    rng.shuffle(eh_par)
+    n_match = int(n * config["match_rate"])
+    is_match = [True] * n_match + [False] * (n - n_match)
+    rng.shuffle(is_match)
 
     n_neg = n - n_match
-    n_hard = int(n_neg * cmp_cfg["hard_negative_rate"])
-    flags_hard = [True] * n_hard + [False] * (n_neg - n_hard)
-    rng.shuffle(flags_hard)
-    iter_hard = iter(flags_hard)
+    n_hard = int(n_neg * config["hard_negative_rate"])
+    hard_flags = [True] * n_hard + [False] * (n_neg - n_hard)
+    rng.shuffle(hard_flags)
+    hard_iterator = iter(hard_flags)
 
-    cnpj_tomador = generate_cnpj(rng)
-    razao_tomador = fake.company()
+    buyer_cnpj = generate_cnpj(rng)
+    buyer_company_name = fake.company()
 
-    pagamentos, notas, verdade = [], [], []
+    payments, invoices, ground_truth = [], [], []
 
     for i, cnpj in enumerate(cnpjs):
-        valor_servicos = round(rng.uniform(*cmp_cfg["invoice_value_range_brl"]), 2)
-        aliquota = round(rng.uniform(*cmp_cfg["iss_rate_range_pct"]), 2)
-        emissao = fake.date_between(start_date="-1y", end_date="-2m")
-        discriminacao = fake.bs()
-        numero = f"{i + 1:06d}"
-        valor_iss = round(valor_servicos * aliquota / 100, 2)
+        service_value = round(rng.uniform(*config["invoice_value_range_brl"]), 2)
+        tax_rate = round(rng.uniform(*config["iss_rate_range_pct"]), 2)
+        issue_date = fake.date_between(start_date="-1y", end_date="-2m")
+        description = fake.bs()
+        invoice_number = f"{i + 1:06d}"
+        iss_amount = round(service_value * tax_rate / 100, 2)
 
-        notas.append({
-            "nfse_numero": numero,
+        invoices.append({
+            "nfse_numero": invoice_number,
             "nfse_codigo_verificacao": "".join(
                 rng.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=8)
             ),
-            "nfse_data_emissao": emissao.isoformat() + "T00:00:00",
-            "nfse_competencia": emissao.replace(day=1).isoformat() + "T00:00:00",
+            "nfse_data_emissao": issue_date.isoformat() + "T00:00:00",
+            "nfse_competencia": issue_date.replace(day=1).isoformat() + "T00:00:00",
             "nfse_cnpj_prestador": cnpj,
             "nfse_razao_social_prestador": fake.company(),
-            "nfse_cnpj_tomador": cnpj_tomador,
-            "nfse_razao_social_tomador": razao_tomador,
-            "nfse_valor_servicos": valor_servicos,
-            "nfse_valor_iss": valor_iss,
-            "nfse_aliquota": aliquota,
-            "nfse_valor_liquido": round(valor_servicos - valor_iss, 2),
+            "nfse_cnpj_tomador": buyer_cnpj,
+            "nfse_razao_social_tomador": buyer_company_name,
+            "nfse_valor_servicos": service_value,
+            "nfse_valor_iss": iss_amount,
+            "nfse_aliquota": tax_rate,
+            "nfse_valor_liquido": round(service_value - iss_amount, 2),
             "nfse_item_lista_servico": rng.choice(_LC116_CODES),
-            "nfse_discriminacao": discriminacao,
-            "nfse_codigo_municipio": municipio_fornecedor[cnpj],
+            "nfse_discriminacao": description,
+            "nfse_codigo_municipio": supplier_municipality[cnpj],
         })
 
-        combos = legal_combos(valor_servicos, aliquota, rates, limite_csrf)
-        no_municipio = centros_por_municipio.get(municipio_fornecedor[cnpj], centros)
+        combinations = legal_combos(service_value, tax_rate, rates, csrf_threshold)
+        municipality_centers = cost_centers_by_municipality.get(supplier_municipality[cnpj], cost_centers)
 
-        if eh_par[i]:
-            retencao = combos[rng.choice(list(combos))]
-            prazo = prazo_fornecedor[cnpj]
-            if rng.random() < cmp_cfg["atypical_term_rate"]:
-                prazo = _shifted_term(rng, prazo, cmp_cfg["term_shift_range"])
-            if rng.random() < cmp_cfg["atypical_description_rate"]:
-                descricao = fake.bs()
+        if is_match[i]:
+            retention_rate = combinations[rng.choice(list(combinations))]
+            term = supplier_payment_terms[cnpj]
+            if rng.random() < config["atypical_term_rate"]:
+                term = _shifted_term(rng, term, config["term_shift_range"])
+            if rng.random() < config["atypical_description_rate"]:
+                payment_description = fake.bs()
             else:
-                descricao = _corrupt_text(discriminacao, rng)
-            if rng.random() < cmp_cfg["same_municipality_rate"]:
-                centro = rng.choice(no_municipio)
+                payment_description = _corrupt_text(description, rng)
+            if rng.random() < config["same_municipality_rate"]:
+                cost_center = rng.choice(municipality_centers)
             else:
-                centro = rng.choice(centros)
-            tipo_negativo = ""
-            nfse_verdadeira = numero
+                cost_center = rng.choice(cost_centers)
+            negative_type = ""
+            true_invoice_number = invoice_number
         else:
-            hard = next(iter_hard)
-            if hard:
-                retencao = combos[rng.choice(list(combos))]
+            is_hard = next(hard_iterator)
+            if is_hard:
+                retention_rate = combinations[rng.choice(list(combinations))]
             else:
-                retencao = _illegitimate_retention(rng, combos, tol)
+                retention_rate = _illegitimate_retention(rng, combinations, tolerance)
 
-            dimensoes = rng.sample(["prazo", "texto", "municipio"], k=rng.randint(1, 3))
-            prazo = prazo_fornecedor[cnpj]
-            if "prazo" in dimensoes:
-                prazo = _shifted_term(rng, prazo, cmp_cfg["term_shift_range"])
-            descricao = fake.bs() if "texto" in dimensoes else _corrupt_text(discriminacao, rng)
-            centro = rng.choice(centros) if "municipio" in dimensoes else rng.choice(no_municipio)
-            tipo_negativo = "hard" if hard else "soft"
-            nfse_verdadeira = ""
+            dimensions = rng.sample(["prazo", "texto", "municipio"], k=rng.randint(1, 3))
+            term = supplier_payment_terms[cnpj]
+            if "prazo" in dimensions:
+                term = _shifted_term(rng, term, config["term_shift_range"])
+            payment_description = fake.bs() if "texto" in dimensions else _corrupt_text(description, rng)
+            cost_center = rng.choice(cost_centers) if "municipio" in dimensions else rng.choice(municipality_centers)
+            negative_type = "hard" if is_hard else "soft"
+            true_invoice_number = ""
 
-        pagamentos.append({
+        payments.append({
             "id_pagamento": f"PAG-{i + 1:06d}",
             "cnpj_fornecedor": cnpj,
-            "data_pagamento": emissao + timedelta(days=prazo),
-            "valor_pago": round(valor_servicos * (1 - retencao / 100), 2),
-            "descricao": descricao,
-            "centro_custo": centro,
-            "municipio_centro_custo": municipio_centro[centro],
+            "data_pagamento": issue_date + timedelta(days=term),
+            "valor_pago": round(service_value * (1 - retention_rate / 100), 2),
+            "descricao": payment_description,
+            "centro_custo": cost_center,
+            "municipio_centro_custo": cost_center_municipality[cost_center],
         })
-        verdade.append({
+        ground_truth.append({
             "id_pagamento": f"PAG-{i + 1:06d}",
-            "nfse_numero": nfse_verdadeira,
-            "tipo_negativo": tipo_negativo,
+            "nfse_numero": true_invoice_number,
+            "tipo_negativo": negative_type,
         })
 
-    return pd.DataFrame(pagamentos), pd.DataFrame(notas), pd.DataFrame(verdade)
+    return pd.DataFrame(payments), pd.DataFrame(invoices), pd.DataFrame(ground_truth)

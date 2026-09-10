@@ -48,3 +48,16 @@ def test_error_names_every_offending_feature():
         assert_no_leak(X, y, max_accuracy=0.95)
     mensagem = str(exc.value)
     assert "copia_1" in mensagem and "copia_2" in mensagem and "ruido" not in mensagem
+
+
+def test_raises_on_degenerate_labels():
+    """Verify clear error when a class has fewer samples than cv splits."""
+    rng = np.random.default_rng(0)
+    # Create a 4-sample dataset with only 2 samples of class 1 (cannot split into 3 folds)
+    y = pd.Series([0, 0, 1, 1])
+    X = pd.DataFrame({"feature": [1.0, 2.0, 3.0, 4.0]})
+    with pytest.raises(ValueError) as exc:
+        stump_accuracies(X, y, cv=3)
+    error_msg = str(exc.value)
+    assert "Cannot create 3 stratified folds" in error_msg
+    assert "minimum count" in error_msg.lower()
