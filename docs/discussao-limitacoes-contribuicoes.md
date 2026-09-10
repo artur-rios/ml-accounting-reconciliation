@@ -411,8 +411,10 @@ metodológico explícito e mensurado.
 ## 4. Experimento de comparação válida: qual algoritmo, afinal
 
 As seções 2 e 3 estabeleceram que a comparação original não tinha poder discriminante. Esta seção
-apresenta o experimento corretivo que finalmente responde à primeira pergunta de pesquisa. O desenho
-completo está em `docs/superpowers/specs/2026-09-10-comparacao-algoritmos-design.md`; reproduz-se com
+apresenta o experimento corretivo que responde à primeira pergunta de pesquisa — e, na §4.6, um terceiro
+achado metodológico que só apareceu quando a primeira versão deste próprio experimento foi auditada.
+
+O desenho está em `docs/superpowers/specs/2026-09-10-comparacao-algoritmos-design.md`; reproduz-se com
 `python run_comparison.py`.
 
 ### 4.1 O que mudou no desenho
@@ -420,9 +422,9 @@ completo está em `docs/superpowers/specs/2026-09-10-comparacao-algoritmos-desig
 Três alterações, todas na raiz do problema diagnosticado:
 
 1. **O rótulo passa a vir do gerador, não de uma regra sobre as features.** O simulador sabe qual
-   pagamento quita qual nota e persiste esse fato. Cada pagamento é pareado com exatamente uma nota
-   candidata do mesmo fornecedor, e o rótulo diz se aquele pareamento é genuíno. O desacoplamento é por
-   construção, não por remoção de variáveis.
+   pagamento quita qual nota e persiste esse fato. Cada pagamento referencia explicitamente uma nota
+   candidata, e o rótulo diz se aquele pareamento é genuíno. O desacoplamento é por construção, não por
+   remoção de variáveis.
 2. **Pares verdadeiros deixam de ser cópias.** O pagamento é derivado da nota por transformação legal —
    retenções tributárias brasileiras (IRRF, CSRF, ISS retido, INSS) e prazo característico do fornecedor.
    As divergências são sorteadas de faixa contínua sobreposta às retenções legítimas, de modo que uma
@@ -432,6 +434,10 @@ Três alterações, todas na raiz do problema diagnosticado:
    exceção sob precisão ≥ 0,90, com o limiar escolhido na partição de validação e aplicado à de teste,
    reportado ao lado da taxa de encaminhamento à revisão manual.
 
+Cada fornecedor emite **cinco notas**, de modo que seu prazo característico seja estimável a partir do
+histórico — condição sem a qual a variável `desvio_prazo_fornecedor` não teria referente, como a §4.6
+detalha. A base tem 7.500 pagamentos, 1.500 fornecedores e 30% de exceções.
+
 Como consequência do item 1, **não há mais pagamentos sem nota candidata** — as deltas são sempre
 computáveis e os valores-sentinela desaparecem. A patologia de escala descrita em §2.2, responsável
 integral pela diferença entre algoritmos no experimento original, deixa de existir por construção.
@@ -440,117 +446,187 @@ integral pela diferença entre algoritmos no experimento original, deixa de exis
 
 Antes de treinar, um guarda ajusta uma árvore de profundidade 1 sobre **cada variável isoladamente** e
 falha o pipeline se alguma ultrapassar 0,95 de acurácia. Nas dez execuções, a maior acurácia de variável
-isolada foi **0,8178**, com folga confortável para o teto.
+isolada foi **0,8173**.
 
 | Variável | Acurácia média do toco |
 | --- | --- |
-| `razao_valor` | 0,8128 |
-| `retencao_implicita_pct` | 0,8128 |
-| `similaridade_descricao` | 0,7870 |
-| `mesmo_municipio` | 0,7749 |
-| `delta_dias` | 0,7420 |
+| `razao_valor` | 0,8131 |
+| `retencao_implicita_pct` | 0,8131 |
+| `similaridade_descricao` | 0,7852 |
+| `mesmo_municipio` | 0,7750 |
+| `desvio_prazo_fornecedor` | 0,7711 |
+| `delta_dias` | 0,7429 |
 
-Nenhuma variável separa as classes sozinha, e — diferentemente do experimento original — as variáveis
-mais informativas são evidências de nível de par, não a própria regra de rotulagem. A tarefa submetida
-aos algoritmos é genuína.
+Nenhuma variável separa as classes sozinha, e as mais informativas são evidências de nível de par, não a
+própria regra de rotulagem. A tarefa submetida aos algoritmos é genuína.
+
+Registre-se, porém, o limite deste instrumento: **o guarda não detecta o defeito descrito em §4.6**. Uma
+variável constante marca exatamente a taxa da classe majoritária, que está muito abaixo do teto — ela
+passa no teste justamente por não conter informação nenhuma.
 
 ### 4.3 Resultados
 
-Dez bases independentes, 7.518 registros cada, três algoritmos, mesma divisão treino/validação/teste
+Dez bases independentes, 7.500 registros cada, três algoritmos, mesma divisão treino/validação/teste
 (60/20/20 estratificado) e mesma grade de hiperparâmetros do experimento original.
 
 | Algoritmo | Recall da exceção | dp | Precisão da exceção | Taxa de encaminhamento | PR-AUC | Sementes aplicáveis |
 | --- | --- | --- | --- | --- | --- | --- |
-| **Random Forest** | **0,8080** | 0,0154 | 0,9093 | 26,67% | 0,9346 | 10/10 |
-| Regressão Logística | 0,7629 | 0,0269 | 0,9089 | 25,20% | 0,9143 | 10/10 |
-| SVM (RBF) | 0,2211 | 0,1248 | 0,9205 | 7,32% | 0,6359 | 10/10 |
+| **Random Forest** | **0,8216** | 0,0169 | 0,8931 | 27,62% | 0,9356 | 10/10 |
+| SVM (RBF) | 0,8002 | 0,0191 | 0,8996 | 26,71% | 0,9258 | 10/10 |
+| Regressão Logística | 0,7698 | 0,0251 | 0,9030 | 25,59% | 0,9153 | 10/10 |
 
-Os três algoritmos atingiram o piso de precisão em todas as dez execuções, de modo que a comparação é
-feita em igualdade de condição operacional.
+Os três atingiram o piso de precisão na validação em todas as dez execuções. A precisão **de teste** fica
+ligeiramente abaixo de 0,90 — 0,893 para a Random Forest — o que é esperado e desejável: o limiar foi
+calibrado na validação e aplicado ao teste sem reajuste. Uma precisão de teste exatamente no piso seria
+indício de que o teste havia sido usado na calibração.
 
 **Wilcoxon pareado, correção de Holm para três comparações:**
 
 | Comparação | Diferença mediana | p | p (Holm) | Significativo |
 | --- | --- | --- | --- | --- |
-| Random Forest × Regressão Logística | +4,67 p.p. | 0,0039 | 0,0059 | sim |
-| Random Forest × SVM | +51,89 p.p. | 0,0020 | 0,0059 | sim |
-| Regressão Logística × SVM | +48,67 p.p. | 0,0020 | 0,0059 | sim |
+| Random Forest × SVM | +1,44 p.p. | 0,0020 | 0,0059 | sim |
+| Random Forest × Regressão Logística | +4,56 p.p. | 0,0020 | 0,0059 | sim |
+| SVM × Regressão Logística | +3,00 p.p. | 0,0039 | 0,0059 | sim |
 
 ### 4.4 A resposta à primeira pergunta de pesquisa
 
 > Sob rotulagem independente das features e critério derivado do objetivo de controle, a **Random Forest**
-> detecta **4,67 pontos percentuais** a mais de divergências que a Regressão Logística, mantendo precisão
-> de 0,90 (Wilcoxon pareado, *p* = 0,0059 após correção de Holm, 10 execuções), ao custo de encaminhar
-> **26,7%** do lote para revisão manual. Ambas superam o SVM com núcleo RBF por margens acima de 48 pontos
-> percentuais.
+> detecta **1,44 pontos percentuais** a mais de divergências que o SVM e **4,56** a mais que a Regressão
+> Logística, mantendo o piso de precisão de 0,90 na validação (Wilcoxon pareado, *p* = 0,0059 após
+> correção de Holm, 10 execuções), ao custo de encaminhar **27,6%** do lote para revisão manual.
 
-Duas ressalvas devem acompanhar essa frase na monografia. A primeira é que 4,67 pontos percentuais, ainda
-que estatisticamente significativos, são uma diferença modesta: em uma carteira de 7.500 pagamentos com
-30% de exceções, a Random Forest encontra cerca de 105 divergências a mais que a Regressão Logística. Se
-a organização valoriza rastreabilidade para auditoria, a regressão logística — cujos coeficientes são
-diretamente interpretáveis — pode ser a escolha superior apesar da diferença
-`[VERIFICAR: Rudin, C. Nature Machine Intelligence, v. 1, 2019]`. A segunda é que a base é sintética, e a
-seção 5 delimita o que isso impede de generalizar.
+A significância estatística não deve ser confundida com relevância prática. A diferença entre a Random
+Forest e o SVM é de **1,44 pontos percentuais**: em uma carteira de 7.500 pagamentos com 30% de exceções,
+cerca de 32 divergências a mais. O teste a detecta porque a ordem se repete nas dez execuções, não porque
+a magnitude seja grande — que é exatamente a razão de o tamanho de efeito ser reportado ao lado do
+p-valor `[VERIFICAR: Demšar, J. JMLR, v. 7, 2006]`.
 
-### 4.5 A estabilidade discrimina mais que a média
+A leitura defensável é, portanto, mais matizada do que "a Random Forest vence": **os três algoritmos são
+operacionalmente próximos**, com a Regressão Logística cerca de 4,6 pontos atrás, e a escolha entre eles
+pode legitimamente recair sobre interpretabilidade e custo em vez de desempenho. Para um sistema que
+precisa justificar cada exceção a um auditor, os coeficientes da regressão logística podem valer mais que
+4,6 pontos de recall `[VERIFICAR: Rudin, C. Nature Machine Intelligence, v. 1, 2019]`.
 
-O desvio-padrão entre sementes separa os algoritmos com mais clareza do que a média: 0,0154 para a
-Random Forest contra 0,1248 para o SVM — uma diferença de oito vezes.
+### 4.5 Estabilidade
 
-| Semente | Random Forest | Regressão Logística | SVM |
+O desvio-padrão entre sementes é pequeno e semelhante nos três: 0,0169 para a Random Forest, 0,0191 para
+o SVM e 0,0251 para a Regressão Logística. Nenhum algoritmo apresenta comportamento bimodal ou regimes
+distintos.
+
+| Semente | Random Forest | SVM | Regressão Logística |
 | --- | --- | --- | --- |
-| 0 | 0,831 | 0,802 | 0,298 |
-| 1 | 0,809 | 0,796 | 0,327 |
-| 2 | 0,796 | 0,780 | 0,329 |
-| 3 | 0,824 | 0,749 | **0,058** |
-| 4 | 0,787 | 0,789 | **0,071** |
-| 5 | 0,822 | 0,751 | 0,318 |
-| 6 | 0,811 | 0,733 | **0,096** |
-| 7 | 0,787 | 0,749 | 0,296 |
-| 8 | 0,802 | 0,724 | **0,084** |
-| 9 | 0,811 | 0,756 | 0,336 |
+| 0 | 0,829 | 0,793 | 0,738 |
+| 1 | 0,820 | 0,791 | 0,742 |
+| 2 | 0,829 | 0,824 | 0,789 |
+| 3 | 0,840 | 0,827 | 0,776 |
+| 4 | 0,811 | 0,764 | 0,738 |
+| 5 | 0,851 | 0,802 | 0,809 |
+| 6 | 0,802 | 0,793 | 0,780 |
+| 7 | 0,796 | 0,789 | 0,764 |
+| 8 | 0,813 | 0,798 | 0,764 |
+| 9 | 0,824 | 0,820 | 0,798 |
 
-O SVM é **bimodal**: em seis execuções fica entre 0,296 e 0,336; em quatro, despenca para a faixa de
-0,058 a 0,096. Não é ruído em torno de uma média — são dois regimes distintos. A causa provável está na
-calibração: o SVM é envelopado em `CalibratedClassifierCV(..., ensemble=False)`, que ajusta a sigmoide
-sobre valores de decisão fora da dobra enquanto o SVC é reajustado sobre todo o treino, tornando a
-posterior aplicada no escore sistematicamente mais confiante do que aquela que a sigmoide observou. O
-ponto de operação em que a precisão de validação alcança 0,90 cai então numa cauda direita esparsa, e
-pequenas variações amostrais o deslocam muito.
+A Random Forest é a melhor em todas as dez execuções, o que sustenta a significância apesar da margem
+estreita.
 
-Para uma recomendação prática, isso importa tanto quanto a média: um classificador cujo recall de exceção
-varia entre 6% e 34% conforme a amostra não é implantável em um controle interno, ainda que sua média
-fosse competitiva.
+Esta tabela merece atenção especial porque **a primeira versão deste experimento produzia um SVM
+bimodal** — seis execuções perto de 0,31 e quatro perto de 0,08 — e este documento chegou a atribuir esse
+padrão à calibração por `CalibratedClassifierCV(ensemble=False)`. A explicação estava errada, e a §4.6
+mostra por quê.
 
-### 4.6 Achado metodológico adicional: a métrica de seleção apontava para a classe errada
+### 4.6 Terceiro achado: o experimento corretivo reproduziu um artefato de representação
 
-Durante a revisão do experimento, descobriu-se que o `GridSearchCV` estava selecionando hiperparâmetros
-para a classe **errada**. O scorer `average_precision` do scikit-learn usa `predict_proba[:, 1]` com
-`pos_label=1` — ou seja, otimiza precisão média para a classe *par legítimo*, enquanto todo o critério de
-decisão, todas as métricas reportadas e o objetivo de controle inteiro são sobre a classe *exceção*
-(rótulo 0).
+O trabalho já havia documentado dois modos de falha silenciosa: o vazamento de rótulo (§2.1) e a métrica
+de seleção apontada para a classe errada (§4.7). A auditoria final deste experimento revelou um terceiro,
+**dentro do próprio experimento construído para evitá-los**.
+
+**O defeito.** A primeira versão do gerador emitia um pagamento por CNPJ. A variável
+`desvio_prazo_fornecedor` é definida como o desvio entre o prazo observado e a **mediana histórica do
+fornecedor**, ajustada apenas na partição de treino. Com um único pagamento por fornecedor, essa mediana
+é o próprio valor da linha, e a variável era identicamente **zero em todas as linhas de treino**. Nenhum
+fornecedor do teste aparecia no treino, de modo que todos recorriam à mediana global e a coluna tinha
+dispersão real fora do treino.
+
+**A consequência.** Não foi uma variável inerte, foi um artefato de escala. Medido sobre 2.000 registros:
+
+| | Treino | Teste |
+| --- | --- | --- |
+| Valores distintos | 1 | — |
+| Desvio-padrão | 0,00 | 25,48 |
+| Fornecedores vistos no treino | — | 0 de 400 |
+
+O `StandardScaler` encontra variância zero, aplica sua guarda (`scale_ = 1`), e as linhas de teste passam
+sem normalização para uma dimensão que o modelo nunca viu variar: **83,75% delas com |z| > 5, máximo 90**.
+O núcleo RBF colapsa. A Random Forest, invariante a transformações monotônicas, e a Regressão Logística,
+cujo coeficiente para uma coluna constante é zero, não são afetadas — **só o SVM**.
+
+**O efeito sobre a conclusão.** Corrigido o gerador para que cada fornecedor emita cinco notas, tornando a
+mediana uma estatística real:
+
+| | Antes | Depois |
+| --- | --- | --- |
+| Recall de exceção do SVM | 0,2211 ± 0,1248 | 0,8002 ± 0,0191 |
+| Posição do SVM | último, 51,9 p.p. atrás | segundo, 1,4 p.p. atrás |
+| Bimodalidade | quatro sementes em ~0,08 | ausente |
+
+A conclusão anterior — "ambas superam o SVM por margens acima de 48 pontos percentuais" — era
+**inteiramente artefato**. E a explicação por calibração oferecida para a bimodalidade era uma
+racionalização plausível de um sintoma cuja causa era outra.
+
+**Por que o guarda anti-vazamento não pegou.** Ele testa se alguma variável prediz o rótulo *bem demais*.
+Uma variável constante prediz o rótulo *mal* — marca exatamente a taxa da classe majoritária. O
+instrumento estava apontado para o excesso de informação, e o defeito era ausência de informação com
+distribuições de treino e teste incompatíveis. **A verificação que teria pego é outra: exigir que nenhuma
+coluna seja constante na partição de treino**, e que treino e teste tenham escalas comparáveis. Essa
+asserção passou a existir na suíte de testes.
+
+**A lição, e por que ela pertence à monografia.** Os três achados são a mesma família — configuração
+silenciosa que produz conclusão substantiva e errada, sem se manifestar como erro:
+
+| Achado | Sintoma | Conclusão falsa que produziria |
+| --- | --- | --- |
+| Vazamento de rótulo (§2.1) | acurácia 1,0000 | "a Random Forest resolve conciliação" |
+| Scorer na classe errada (§4.7) | SVM em 0,088 | "o SVM não serve para conciliação" |
+| Variável constante no treino (§4.6) | SVM em 0,221, bimodal | "o SVM é instável em conciliação" |
+
+Os três produziriam tabelas plausíveis. Dois deles foram encontrados por revisão adversarial do código, e
+não pelas métricas — que em nenhum dos casos exibiram sinal de anomalia. A contribuição metodológica não é
+"verifique vazamento": é que **a verificação precisa ser sistemática e adversarial, porque cada instrumento
+só enxerga o modo de falha para o qual foi construído**. O guarda anti-vazamento é útil e não teria
+detectado dois dos três.
+
+**Ressalva de honestidade.** O artefato foi reduzido, não eliminado. Com cinco pagamentos por fornecedor,
+uma linha de treino contribui para a mediana do próprio fornecedor, de modo que seu desvio é encolhido em
+relação ao de uma linha de teste: desvio-padrão 12,6 no treino contra 19,0 no teste. É o mesmo mecanismo
+em amplitude muito menor — as linhas extremas de teste ficam perto de |z| ≈ 5,5, uma cauda fina, não o
+grosso da distribuição. Uma mediana *leave-one-out*, ou mais pagamentos por fornecedor, removeria o
+resíduo. Fica registrado como limitação 27.
+
+### 4.7 Achado anterior: a métrica de seleção apontava para a classe errada
+
+Durante a implementação, descobriu-se que o `GridSearchCV` estava selecionando hiperparâmetros para a
+classe **errada**. O scorer `average_precision` do scikit-learn usa `pos_label=1` — otimiza precisão média
+para a classe *par legítimo*, enquanto todo o critério de decisão e o objetivo de controle são sobre a
+classe *exceção* (rótulo 0).
 
 Random Forest e Regressão Logística quase não se alteraram, porque suas precisões médias para as duas
 classes se movem juntas ao longo de uma grade grosseira. O SVM, cujo único hiperparâmetro ajustado é `C`,
-foi severamente afetado: o `C` que maximiza a precisão média da classe majoritária não ordena bem as
-exceções. Corrigido o scorer para `pos_label=0`, o recall de exceção do SVM saltou de **0,088 para
-0,312** em execução de duas sementes, enquanto Random Forest e Regressão Logística permaneceram estáveis.
+foi severamente afetado. Corrigido o scorer para `pos_label=0`, o recall de exceção do SVM saltou de
+**0,088 para 0,312** — e só depois da correção descrita em §4.6 chegou a 0,800.
 
-Este é o segundo achado da mesma família do vazamento de rótulo, e merece figurar na monografia ao lado
-dele: **em ambos os casos, um detalhe de configuração silencioso teria produzido uma conclusão
-substantiva e errada** — primeiro "a Random Forest resolve conciliação com acurácia perfeita", depois "o
-SVM não serve para automatizar conciliação". Nenhum dos dois se manifestaria como erro; ambos produziriam
-tabelas plausíveis. A lição transferível é que, em domínios com classes assimétricas, **a orientação da
-métrica de seleção precisa ser verificada empiricamente, não presumida a partir do nome da métrica**.
+Vale notar que **os dois defeitos se acumulavam sobre o mesmo algoritmo**, cada um punindo o SVM por uma
+razão diferente. Isso é instrutivo: encontrar e corrigir um deles não revelou o outro, porque o resultado
+continuou plausível — um SVM em 0,312 ainda parecia "simplesmente pior", e teria sido reportado como tal.
 
-### 4.7 O que este experimento permite afirmar, e o que não
+### 4.8 O que este experimento permite afirmar, e o que não
 
 | Pergunta | Experimento original | Experimento de comparação |
 | --- | --- | --- |
-| Qual algoritmo é melhor? | Não responde — o rótulo é função das features | Random Forest, com significância estatística |
-| A diferença é do algoritmo ou da representação? | Da representação (artefato da sentinela) | Do algoritmo — a sentinela não existe mais |
-| A tarefa é aprendível? | Não, removido o vazamento | Sim: 0,81 de recall sob precisão 0,90 |
-| Vale generalizar para dados reais? | Não | Não — a base continua sintética (§5.2) |
+| Qual algoritmo é melhor? | Não responde — o rótulo é função das features | Random Forest, mas por margem estreita sobre o SVM |
+| A diferença é do algoritmo ou da representação? | Da representação (artefato da sentinela) | Do algoritmo — depois de dois artefatos de representação terem sido removidos deste experimento também |
+| A tarefa é aprendível? | Não, removido o vazamento | Sim: 0,82 de recall sob piso de precisão 0,90 |
+| Os algoritmos diferem muito entre si? | Pergunta inrespondível | Não: 5,2 p.p. separam o melhor do pior |
+| Vale generalizar para dados reais? | Não | Não — a base continua sintética (§5.2, §5.4) |
 
 ---
 
@@ -602,8 +678,9 @@ apresentação oral, antes que a banca as levante.
 | 24 | **A base continua sintética.** Todas as limitações de validade externa 9, 10, 11, 14, 15, 16 e 17 permanecem integralmente. O experimento demonstra que a tarefa *construída* é aprendível e que os algoritmos diferem *nela* — não que conciliação real seja aprendível. | Alta |
 | 25 | **As alíquotas de retenção são parâmetros, não afirmações normativas.** IRRF 1,5%, CSRF 4,65%, INSS 11% e o limite de R$ 5.000 estão em `config.yaml` e precisam de conferência contra a legislação vigente antes de qualquer afirmação jurídica no texto. | Alta |
 | 26 | **A dificuldade da tarefa é um parâmetro escolhido.** `hard_negative_rate: 0.30` determina quanto da base é resolvível apenas pela razão de valor. Um valor diferente moveria as três médias. O valor usado foi fixado antes de observar os resultados e não foi ajustado depois — mas isso é uma afirmação sobre o processo, não uma propriedade verificável do artefato. | Alta |
-| 27 | **A similaridade textual é acoplada à partição.** O `TfidfVectorizer` é reajustado a cada chamada de `build_features_v2`, de modo que o IDF de um registro depende de com quais outros ele foi processado — a mesma acoplagem transdutiva que o estudo critica, em escala menor. | Média |
-| 28 | **A instabilidade do SVM não foi isolada experimentalmente.** A explicação por calibração em §4.5 é uma hipótese coerente com a evidência, não um resultado controlado. Confirmá-la exigiria comparar com `ensemble=True` e com um SVM sem calibração. | Média |
+| 27 | **Resíduo do artefato de escala em `desvio_prazo_fornecedor`.** Com cinco pagamentos por fornecedor, uma linha de treino contribui para a mediana do próprio fornecedor e tem o desvio encolhido em relação a uma linha de teste: desvio-padrão 12,6 no treino contra 19,0 no teste. É o mesmo mecanismo de §4.6 em amplitude muito menor, mas não é zero. Uma mediana *leave-one-out* o eliminaria. | Média |
+| 28 | **A similaridade textual é acoplada à partição.** O `TfidfVectorizer` é reajustado a cada chamada de `build_features_v2`, de modo que o IDF de um registro depende de com quais outros ele foi processado — a mesma acoplagem transdutiva que o estudo critica, em escala menor. Como consequência, `similaridade_descricao` não é computável para um registro novo isolado em inferência. | Média |
+| 29 | **O guarda anti-vazamento só enxerga um modo de falha.** Ele detecta variáveis que predizem o rótulo *bem demais*. Não detecta variáveis constantes no treino, nem incompatibilidade de escala entre partições — que foram exatamente os defeitos de §4.6. A suíte ganhou asserções para esses casos, mas a lista de verificações continua sendo enumerada por descoberta, não por construção. | Alta |
 
 ### 5.5 Limitações de implementação e documentação
 
@@ -613,8 +690,9 @@ apresentação oral, antes que a banca as levante.
 | 22 | **Variável constante em produção.** `cnpj_match` assume valor 1 em 100% dos registros, sem contribuição informacional. | Baixa |
 | 23 | **Codificação por sentinela.** `delta_days = 9999` e `delta_valor_pct = 100` para ausência de correspondência distorcem a padronização e prejudicam modelos sensíveis à escala — responsável integral pela diferença entre algoritmos (§3.3). | Alta |
 
-> **Ação recomendada antes da entrega:** corrigir a limitação 21. É a única inconsistência puramente
-> documental da lista, e a mais fácil de uma banca detectar comparando o README com o código.
+> **Nota.** As limitações 4, 7, 12, 20 e 21 foram resolvidas ao longo deste trabalho, e cada uma indica
+> o escopo de sua resolução. As demais permanecem, e as de gravidade **Alta** devem ser assumidas
+> espontaneamente no texto e na apresentação oral.
 
 ---
 
@@ -719,8 +797,15 @@ pipeline** — não emite aviso — se alguma ultrapassar um teto configurável.
 "acurácia elevada deve ser tratada como sinal de alarme" em verificação executável, e roda antes de cada
 treino. É diretamente transplantável para qualquer projeto que treine sobre rótulos gerados por regras
 internas, que é a situação da maioria das organizações. O experimento de comparação o exercita em 10
-execuções (§4.2), e a §4.6 documenta um segundo modo de falha da mesma família que ele **não** captura —
-uma métrica de seleção apontada para a classe errada — delimitando o alcance do artefato.
+execuções (§4.2).
+
+A delimitação do artefato é parte da contribuição, e é honesta: **o guarda não capturou dois dos três
+modos de falha que este trabalho documenta**. Ele detecta excesso de informação em uma variável, e foi
+cego tanto à métrica de seleção apontada para a classe errada (§4.7) quanto à variável constante no
+treino com escalas incompatíveis entre partições (§4.6). A suíte de testes ganhou asserções para o
+segundo caso. O aprendizado que se transfere não é o instrumento, e sim que **cada instrumento só enxerga
+o modo de falha para o qual foi construído** — o que torna a revisão adversarial do código insubstituível
+por verificação automatizada.
 
 **7.6 Arquitetura de referência em camadas.**
 A separação entre simulação, ETL, modelagem e avaliação, com configuração externalizada e artefatos
@@ -759,10 +844,16 @@ demais permanecem em aberto, em ordem de retorno esperado:
    sementes, Wilcoxon pareado com correção de Holm e tamanho de efeito.
 10. **Comparar com linha de base não supervisionada.** Detecção de anomalias (*Isolation Forest*,
     *autoencoders*) dispensa rótulos e, por isso, é imune ao vazamento aqui documentado.
-11. **Isolar a causa da instabilidade do SVM.** Comparar `CalibratedClassifierCV(ensemble=True)`,
-    `ensemble=False` e SVM sem calibração, para confirmar ou refutar a hipótese de §4.5.
-12. **Varrer `hard_negative_rate`.** Mapear como a diferença entre algoritmos responde à dificuldade da
-    tarefa, transformando a limitação 26 em resultado.
+11. **Varrer `hard_negative_rate`.** Mapear como a diferença entre algoritmos responde à dificuldade da
+    tarefa, transformando a limitação 26 em resultado. Com apenas 5,2 pontos percentuais separando o
+    melhor do pior algoritmo (§4.3), é plausível que a ordem se altere em outros regimes de dificuldade —
+    o que seria um resultado mais informativo que o ranking atual.
+12. **Adotar mediana *leave-one-out* para o prazo do fornecedor.** Elimina o resíduo de escala da
+    limitação 27, e é o fecho natural do achado de §4.6.
+13. **Ampliar o conjunto de verificações automatizadas de representação.** O guarda anti-vazamento cobre
+    um modo de falha; a suíte ganhou asserções para variável constante e escala entre partições. Um
+    catálogo sistemático — deriva de distribuição entre partições, colunas de variância quase nula,
+    features com correlação perfeita entre si — transformaria a lição de §4.6 em ferramenta.
 
 ---
 
@@ -789,15 +880,24 @@ quantifica, converte vulnerabilidade em demonstração de rigor.
 > estáveis.
 
 **"E afinal, qual algoritmo é melhor?"**
-> A Random Forest, com significância estatística — mas só depois de corrigir o desenho. No experimento
-> original a pergunta era inrespondível, porque o rótulo era função das próprias features. Refiz o
-> experimento com o rótulo vindo da verdade de origem do gerador, com sinal genuíno construído a partir
-> de retenções tributárias, e com um guarda que falha o pipeline se qualquer variável isolada separar as
-> classes. Sob esse desenho, em 10 execuções independentes, a Random Forest detecta 4,67 pontos
-> percentuais a mais de divergências que a Regressão Logística mantendo precisão de 0,90, com p = 0,0059
-> após correção de Holm. Ambas superam o SVM por mais de 48 pontos. Duas ressalvas: a diferença para a
-> regressão logística é modesta, e a regressão é interpretável, o que pode compensá-la em contexto de
-> auditoria; e o SVM não é apenas pior, é instável — seu recall varia de 6% a 34% conforme a semente.
+> A Random Forest — mas a margem é estreita e a história de como cheguei a ela é mais importante que o
+> ranking. Em 10 execuções independentes, com o rótulo vindo da verdade de origem do gerador e seleção
+> por recall de exceção sob piso de precisão de 0,90, a Random Forest detecta 1,44 pontos percentuais a
+> mais que o SVM e 4,56 a mais que a Regressão Logística, com p = 0,0059 após correção de Holm. A
+> significância vem da ordem se repetir nas dez execuções, não da magnitude: 5,2 pontos separam o melhor
+> do pior, e os três são operacionalmente próximos. Minha leitura é que a escolha pode legitimamente
+> recair sobre interpretabilidade em vez de desempenho.
+
+**"Como você sabe que esse resultado está certo, se os anteriores estavam errados?"**
+> Não sei que está certo — sei que sobreviveu a três auditorias que derrubaram versões anteriores. A
+> primeira resposta deste mesmo experimento dizia que o SVM ficava 51,9 pontos atrás; era artefato de uma
+> variável constante na partição de treino, que fazia o `StandardScaler` passar valores de teste sem
+> normalizar e colapsar o núcleo RBF. Corrigido, o SVM foi de 0,221 para 0,800. Antes disso, o scorer do
+> `GridSearchCV` otimizava a classe errada, o que já havia punido o mesmo algoritmo. Documentei os três
+> defeitos na §4.6 porque eles são o achado mais transferível do trabalho: nenhum se manifestou como
+> erro, os três produziram tabelas plausíveis, e dois deles passaram pelo guarda anti-vazamento que eu
+> mesmo construí para detectar esse tipo de problema. A conclusão metodológica é que cada instrumento de
+> verificação só enxerga o modo de falha para o qual foi construído.
 
 **"Qual é a utilidade prática, então?"**
 > Três resultados acionáveis. Primeiro: quando a regra de conciliação é conhecida, aprendizado de máquina
