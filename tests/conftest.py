@@ -1,3 +1,12 @@
+import matplotlib
+
+# Force the non-interactive Agg backend before any test imports pyplot.
+# evaluator.py only ever saves figures to disk (fig.savefig) and never
+# displays them, so the default GUI backend (TkAgg on this machine) is
+# unnecessary and its Tk/Tcl window creation is a flaky dependency in a
+# headless test run.
+matplotlib.use("Agg")
+
 import pytest
 import pandas as pd
 import datetime
@@ -14,7 +23,7 @@ def sample_config():
         "models": {
             "random_forest": {"n_estimators": 10, "class_weight": "balanced_subsample"},
             "svm": {"kernel": "rbf", "class_weight": "balanced"},
-            "logistic_regression": {"penalty": "l2", "class_weight": "balanced"},
+            "logistic_regression": {"l1_ratio": 0, "class_weight": "balanced"},
             "cv_folds": 2,
             "scoring": "f1_macro",
             "test_size": 0.20,

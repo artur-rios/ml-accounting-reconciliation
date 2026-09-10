@@ -28,7 +28,7 @@ def mini_config():
         "models": {
             "random_forest": {"n_estimators": 10, "class_weight": "balanced_subsample"},
             "svm": {"kernel": "rbf", "class_weight": "balanced"},
-            "logistic_regression": {"penalty": "l2", "class_weight": "balanced"},
+            "logistic_regression": {"l1_ratio": 0, "class_weight": "balanced"},
             "cv_folds": 2,
             "scoring": "f1_macro",
             "test_size": 0.25,
