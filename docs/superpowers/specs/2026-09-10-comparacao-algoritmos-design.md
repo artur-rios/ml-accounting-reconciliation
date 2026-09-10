@@ -103,6 +103,15 @@ por registro, de modo que cada fornecedor tenha um prazo característico — est
 pode aprender a partir do histórico. Um pagamento verdadeiro ocasionalmente foge do prazo típico do
 fornecedor (ver 4.4).
 
+> **Revisão de 2026-09-10 (commit `4277230`).** A primeira implementação emitia **um pagamento por
+> fornecedor**, o que tornava esta afirmação falsa: sem vários pagamentos, não há histórico, a mediana por
+> fornecedor é o próprio valor da linha e `desvio_prazo_fornecedor` fica identicamente zero na partição de
+> treino. Isso produziu um artefato de escala que colapsou o núcleo RBF e derrubou o SVM de 0,80 para 0,22
+> de recall de exceção — o mesmo tipo de defeito que este experimento existe para evitar. O gerador passou
+> a sortear fornecedores de um pool (`payments_per_supplier: 5`), e o pagamento carrega referência
+> explícita à nota candidata, já que a junção por CNPJ deixou de ser 1:1. Ver §4.6 do documento de
+> discussão.
+
 **Retenções tributárias.** `valor_pago = valor_servicos × (1 − Σ retenções)`, com as retenções sorteadas
 de um conjunto de combinações plausíveis:
 
