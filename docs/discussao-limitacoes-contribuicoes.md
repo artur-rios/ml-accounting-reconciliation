@@ -2,8 +2,8 @@
 
 Material de apoio para a redação dos capítulos finais do TCC — MBA em Engenharia de Software (USP/ESALQ).
 Todos os números citados foram extraídos diretamente dos artefatos do repositório
-(`data/results/*/metrics_summary.csv`, `data/results/ablation/ablation_summary.csv`, matrizes de confusão,
-`data/processed/*.csv`) e do código-fonte.
+(`data/results/*/metrics_summary.csv`, `data/results/ablation/ablation_summary.csv`,
+`data/results/comparison/*.csv`, matrizes de confusão, `data/processed/*.csv`) e do código-fonte.
 
 > **Aviso sobre as referências.** As obras citadas ao longo do texto são sugestões de ancoragem teórica.
 > Elas são reais e amplamente conhecidas nas respectivas áreas, mas **você deve conferir autoria, ano,
@@ -287,7 +287,7 @@ construção**. O problema de geração de candidatos, que é o núcleo computac
 Esse é o ponto em que o trabalho mais se afasta da conciliação praticada em organizações, onde é rotineiro
 que um pagamento quite várias notas, que uma nota seja quitada em parcelas, ou que existam múltiplos
 fornecedores com dados cadastrais semelhantes. Reconhecer isso explicitamente fortalece a monografia, e
-converte a limitação em agenda de pesquisa bem delimitada (seção 7).
+converte a limitação em agenda de pesquisa bem delimitada (seção 8).
 
 ---
 
@@ -408,52 +408,208 @@ metodológico explícito e mensurado.
 
 ---
 
-## 4. Limitações do estudo
+## 4. Experimento de comparação válida: qual algoritmo, afinal
+
+As seções 2 e 3 estabeleceram que a comparação original não tinha poder discriminante. Esta seção
+apresenta o experimento corretivo que finalmente responde à primeira pergunta de pesquisa. O desenho
+completo está em `docs/superpowers/specs/2026-09-10-comparacao-algoritmos-design.md`; reproduz-se com
+`python run_comparison.py`.
+
+### 4.1 O que mudou no desenho
+
+Três alterações, todas na raiz do problema diagnosticado:
+
+1. **O rótulo passa a vir do gerador, não de uma regra sobre as features.** O simulador sabe qual
+   pagamento quita qual nota e persiste esse fato. Cada pagamento é pareado com exatamente uma nota
+   candidata do mesmo fornecedor, e o rótulo diz se aquele pareamento é genuíno. O desacoplamento é por
+   construção, não por remoção de variáveis.
+2. **Pares verdadeiros deixam de ser cópias.** O pagamento é derivado da nota por transformação legal —
+   retenções tributárias brasileiras (IRRF, CSRF, ISS retido, INSS) e prazo característico do fornecedor.
+   As divergências são sorteadas de faixa contínua sobreposta às retenções legítimas, de modo que uma
+   razão de valor de 0,9535 deixe de significar "não conciliado" e passe a significar "compatível com
+   retenção de PIS/COFINS/CSLL".
+3. **A seleção de modelo passa a derivar do objetivo de controle.** A métrica é o recall da classe de
+   exceção sob precisão ≥ 0,90, com o limiar escolhido na partição de validação e aplicado à de teste,
+   reportado ao lado da taxa de encaminhamento à revisão manual.
+
+Como consequência do item 1, **não há mais pagamentos sem nota candidata** — as deltas são sempre
+computáveis e os valores-sentinela desaparecem. A patologia de escala descrita em §2.2, responsável
+integral pela diferença entre algoritmos no experimento original, deixa de existir por construção.
+
+### 4.2 O guarda anti-vazamento aprovou a base
+
+Antes de treinar, um guarda ajusta uma árvore de profundidade 1 sobre **cada variável isoladamente** e
+falha o pipeline se alguma ultrapassar 0,95 de acurácia. Nas dez execuções, a maior acurácia de variável
+isolada foi **0,8178**, com folga confortável para o teto.
+
+| Variável | Acurácia média do toco |
+| --- | --- |
+| `razao_valor` | 0,8128 |
+| `retencao_implicita_pct` | 0,8128 |
+| `similaridade_descricao` | 0,7870 |
+| `mesmo_municipio` | 0,7749 |
+| `delta_dias` | 0,7420 |
+
+Nenhuma variável separa as classes sozinha, e — diferentemente do experimento original — as variáveis
+mais informativas são evidências de nível de par, não a própria regra de rotulagem. A tarefa submetida
+aos algoritmos é genuína.
+
+### 4.3 Resultados
+
+Dez bases independentes, 7.518 registros cada, três algoritmos, mesma divisão treino/validação/teste
+(60/20/20 estratificado) e mesma grade de hiperparâmetros do experimento original.
+
+| Algoritmo | Recall da exceção | dp | Precisão da exceção | Taxa de encaminhamento | PR-AUC | Sementes aplicáveis |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Random Forest** | **0,8080** | 0,0154 | 0,9093 | 26,67% | 0,9346 | 10/10 |
+| Regressão Logística | 0,7629 | 0,0269 | 0,9089 | 25,20% | 0,9143 | 10/10 |
+| SVM (RBF) | 0,2211 | 0,1248 | 0,9205 | 7,32% | 0,6359 | 10/10 |
+
+Os três algoritmos atingiram o piso de precisão em todas as dez execuções, de modo que a comparação é
+feita em igualdade de condição operacional.
+
+**Wilcoxon pareado, correção de Holm para três comparações:**
+
+| Comparação | Diferença mediana | p | p (Holm) | Significativo |
+| --- | --- | --- | --- | --- |
+| Random Forest × Regressão Logística | +4,67 p.p. | 0,0039 | 0,0059 | sim |
+| Random Forest × SVM | +51,89 p.p. | 0,0020 | 0,0059 | sim |
+| Regressão Logística × SVM | +48,67 p.p. | 0,0020 | 0,0059 | sim |
+
+### 4.4 A resposta à primeira pergunta de pesquisa
+
+> Sob rotulagem independente das features e critério derivado do objetivo de controle, a **Random Forest**
+> detecta **4,67 pontos percentuais** a mais de divergências que a Regressão Logística, mantendo precisão
+> de 0,90 (Wilcoxon pareado, *p* = 0,0059 após correção de Holm, 10 execuções), ao custo de encaminhar
+> **26,7%** do lote para revisão manual. Ambas superam o SVM com núcleo RBF por margens acima de 48 pontos
+> percentuais.
+
+Duas ressalvas devem acompanhar essa frase na monografia. A primeira é que 4,67 pontos percentuais, ainda
+que estatisticamente significativos, são uma diferença modesta: em uma carteira de 7.500 pagamentos com
+30% de exceções, a Random Forest encontra cerca de 105 divergências a mais que a Regressão Logística. Se
+a organização valoriza rastreabilidade para auditoria, a regressão logística — cujos coeficientes são
+diretamente interpretáveis — pode ser a escolha superior apesar da diferença
+`[VERIFICAR: Rudin, C. Nature Machine Intelligence, v. 1, 2019]`. A segunda é que a base é sintética, e a
+seção 5 delimita o que isso impede de generalizar.
+
+### 4.5 A estabilidade discrimina mais que a média
+
+O desvio-padrão entre sementes separa os algoritmos com mais clareza do que a média: 0,0154 para a
+Random Forest contra 0,1248 para o SVM — uma diferença de oito vezes.
+
+| Semente | Random Forest | Regressão Logística | SVM |
+| --- | --- | --- | --- |
+| 0 | 0,831 | 0,802 | 0,298 |
+| 1 | 0,809 | 0,796 | 0,327 |
+| 2 | 0,796 | 0,780 | 0,329 |
+| 3 | 0,824 | 0,749 | **0,058** |
+| 4 | 0,787 | 0,789 | **0,071** |
+| 5 | 0,822 | 0,751 | 0,318 |
+| 6 | 0,811 | 0,733 | **0,096** |
+| 7 | 0,787 | 0,749 | 0,296 |
+| 8 | 0,802 | 0,724 | **0,084** |
+| 9 | 0,811 | 0,756 | 0,336 |
+
+O SVM é **bimodal**: em seis execuções fica entre 0,296 e 0,336; em quatro, despenca para a faixa de
+0,058 a 0,096. Não é ruído em torno de uma média — são dois regimes distintos. A causa provável está na
+calibração: o SVM é envelopado em `CalibratedClassifierCV(..., ensemble=False)`, que ajusta a sigmoide
+sobre valores de decisão fora da dobra enquanto o SVC é reajustado sobre todo o treino, tornando a
+posterior aplicada no escore sistematicamente mais confiante do que aquela que a sigmoide observou. O
+ponto de operação em que a precisão de validação alcança 0,90 cai então numa cauda direita esparsa, e
+pequenas variações amostrais o deslocam muito.
+
+Para uma recomendação prática, isso importa tanto quanto a média: um classificador cujo recall de exceção
+varia entre 6% e 34% conforme a amostra não é implantável em um controle interno, ainda que sua média
+fosse competitiva.
+
+### 4.6 Achado metodológico adicional: a métrica de seleção apontava para a classe errada
+
+Durante a revisão do experimento, descobriu-se que o `GridSearchCV` estava selecionando hiperparâmetros
+para a classe **errada**. O scorer `average_precision` do scikit-learn usa `predict_proba[:, 1]` com
+`pos_label=1` — ou seja, otimiza precisão média para a classe *par legítimo*, enquanto todo o critério de
+decisão, todas as métricas reportadas e o objetivo de controle inteiro são sobre a classe *exceção*
+(rótulo 0).
+
+Random Forest e Regressão Logística quase não se alteraram, porque suas precisões médias para as duas
+classes se movem juntas ao longo de uma grade grosseira. O SVM, cujo único hiperparâmetro ajustado é `C`,
+foi severamente afetado: o `C` que maximiza a precisão média da classe majoritária não ordena bem as
+exceções. Corrigido o scorer para `pos_label=0`, o recall de exceção do SVM saltou de **0,088 para
+0,312** em execução de duas sementes, enquanto Random Forest e Regressão Logística permaneceram estáveis.
+
+Este é o segundo achado da mesma família do vazamento de rótulo, e merece figurar na monografia ao lado
+dele: **em ambos os casos, um detalhe de configuração silencioso teria produzido uma conclusão
+substantiva e errada** — primeiro "a Random Forest resolve conciliação com acurácia perfeita", depois "o
+SVM não serve para automatizar conciliação". Nenhum dos dois se manifestaria como erro; ambos produziriam
+tabelas plausíveis. A lição transferível é que, em domínios com classes assimétricas, **a orientação da
+métrica de seleção precisa ser verificada empiricamente, não presumida a partir do nome da métrica**.
+
+### 4.7 O que este experimento permite afirmar, e o que não
+
+| Pergunta | Experimento original | Experimento de comparação |
+| --- | --- | --- |
+| Qual algoritmo é melhor? | Não responde — o rótulo é função das features | Random Forest, com significância estatística |
+| A diferença é do algoritmo ou da representação? | Da representação (artefato da sentinela) | Do algoritmo — a sentinela não existe mais |
+| A tarefa é aprendível? | Não, removido o vazamento | Sim: 0,81 de recall sob precisão 0,90 |
+| Vale generalizar para dados reais? | Não | Não — a base continua sintética (§5.2) |
+
+---
+
+## 5. Limitações do estudo
 
 Recomenda-se apresentar as limitações em quatro blocos, na ordem abaixo. A coluna "gravidade" é sugestão
 de priorização para a arguição: limitações **altas** devem ser assumidas espontaneamente no texto e na
 apresentação oral, antes que a banca as levante.
 
-### 4.1 Limitações de validade interna
+### 5.1 Limitações de validade interna
 
 | # | Limitação | Gravidade | Evidência no repositório |
 | --- | --- | --- | --- |
-| 1 | **Vazamento de rótulo.** `delta_days` e `delta_valor_pct` são simultaneamente a regra de rotulagem e variáveis preditoras, tornando o alvo função determinística das entradas. Quantificado em §3.4. | Alta | `labeler.py:56-70` vs. `features.py:22-23` |
-| 2 | **Vazamento secundário.** `nfse_valor_iss` e `nfse_aliquota` codificam indiretamente a existência de correspondência. Isolado em `no_leak_strict`. | Média | `features.py:25-26`; §3.4 |
+| 1 | **Vazamento de rótulo.** `delta_days` e `delta_valor_pct` são simultaneamente a regra de rotulagem e variáveis preditoras, tornando o alvo função determinística das entradas. Quantificado em §3.4. **Não herdada pelo experimento de comparação** (§4.1), onde o rótulo vem da verdade de origem. | Alta | `labeler.py:56-70` vs. `features.py:22-23` |
+| 2 | **Vazamento secundário.** `nfse_valor_iss` e `nfse_aliquota` codificam indiretamente a existência de correspondência. Isolado em `no_leak_strict`. **Não herdada** — no experimento de comparação toda nota candidata existe, e o guarda anti-vazamento verifica cada variável (§4.2). | Média | `features.py:25-26`; §3.4 |
 | 3 | **Métricas saturadas.** Com acurácia unitária, os intervalos de confiança colapsam e a comparação entre algoritmos perde poder estatístico. | Alta | `metrics_summary.csv`, dp de CV = 0,0000 |
-| 4 | **Ausência de teste de significância.** As diferenças reportadas entre algoritmos e entre configurações não foram submetidas a teste de hipótese. | Média | Ausente em `evaluator.py` e `run_ablation.py` |
+| 4 | ~~**Ausência de teste de significância.**~~ **Resolvida em §4.3:** Wilcoxon pareado sobre 10 sementes com correção de Holm, tamanho de efeito reportado ao lado do p. Permanece válida para o experimento original e para a ablação. | Resolvida | `comparison_stats.py`; `wilcoxon.csv` |
 | 5 | **Validação cruzada não temporal.** Os dados possuem dimensão temporal (datas de pagamento e emissão), mas o `StratifiedKFold` embaralha os registros, permitindo treino com informação posterior ao teste. | Média | `trainer.py:80` |
-| 6 | **Métrica de seleção inadequada ao domínio.** `f1_macro` trata falsos positivos e falsos negativos como equivalentes, contrariando a assimetria de custo da conciliação. | Média | `config.yaml`, `scoring: f1_macro` |
-| 7 | **Semente única.** Todo o experimento roda com `random_seed: 42`; não há repetição sob diferentes sementes, logo não há estimativa da variabilidade das métricas em relação à amostra sintética. | Média | `config.yaml` |
+| 6 | **Métrica de seleção inadequada ao domínio.** `f1_macro` trata falsos positivos e falsos negativos como equivalentes, contrariando a assimetria de custo da conciliação. **Corrigida no experimento de comparação** (§4.1), que seleciona por recall de exceção sob piso de precisão — mas ver §4.6: a orientação do scorer precisou ser verificada empiricamente. | Média | `config.yaml`, `scoring: f1_macro` |
+| 7 | ~~**Semente única.**~~ **Resolvida em §4.3:** o experimento de comparação roda 10 bases independentes e reporta desvio-padrão entre sementes — que revelou a bimodalidade do SVM (§4.5). Permanece válida para o experimento original e para a ablação. | Resolvida | `run_comparison.py`; `per_seed_metrics.csv` |
 | 8 | **Importância por impureza.** Método enviesado para variáveis contínuas; não foram calculadas importâncias por permutação. | Baixa | `evaluator.py` |
 
-### 4.2 Limitações de validade externa
+### 5.2 Limitações de validade externa
 
 | # | Limitação | Gravidade |
 | --- | --- | --- |
 | 9 | **Dados inteiramente sintéticos.** Nenhum registro contábil real foi utilizado; a distribuição conjunta das variáveis reflete as decisões do gerador, não a realidade empresarial. | Alta |
 | 10 | **Correspondência 1:1 por construção.** CNPJs únicos por pagamento e uma NFS-e por pagamento eliminam o cenário N:M (um pagamento para várias notas, pagamentos parcelados), que é dominante na prática. | Alta |
 | 11 | **Janelas de tolerância vazias.** O gerador produz divergências de 6-30 dias e 3-20%, fora das tolerâncias de ±5 dias e ±2%; o cenário `fuzzy` não exercitou a tolerância que se propunha a testar. | Alta |
-| 12 | **Ausência de ruído textual realista.** Razões sociais, descrições e discriminações são geradas independentemente; não há abreviações, erros de digitação, grafias alternativas ou variação de nomenclatura — exatamente o ruído que motiva o uso de similaridade textual. | Alta |
+| 12 | ~~**Ausência de ruído textual realista.**~~ **Resolvida no experimento de comparação** (§4.1), onde a descrição do pagamento é derivada da discriminação da nota por abreviação, transposição de caracteres e perda de acentuação, e `similaridade_descricao` passa a carregar sinal genuíno (0,787 de acurácia isolada, §4.2). Permanece válida para o experimento original. Texto original: Razões sociais, descrições e discriminações são geradas independentemente; não há abreviações, erros de digitação, grafias alternativas ou variação de nomenclatura — exatamente o ruído que motiva o uso de similaridade textual. | Resolvida |
 | 13 | **Ausência de sinal aprendível residual.** Removido o vazamento, a base não contém informação suficiente para a tarefa (§3.4), o que impede generalizar qualquer conclusão sobre viabilidade de aprendizado supervisionado em conciliação. | Alta |
 | 14 | **Taxa de conciliação fixa em 70%.** Parâmetro arbitrário, não calibrado por evidência empírica sobre taxas reais de conciliação em contas a pagar. | Média |
 | 15 | **Escopo restrito a NFS-e.** Apenas notas de serviço no padrão ABRASF; NF-e de mercadorias, notas de importação e documentos não fiscais ficaram fora. | Média |
 | 16 | **Ausência de deriva temporal.** A base cobre um ano sem mudanças de regime (alteração de fornecedores, política de pagamento, sazonalidade), impedindo avaliar degradação do modelo ao longo do tempo. | Média |
 | 17 | **Volume único.** Um só tamanho de base (7.500 registros); não há curva de aprendizado que informe o volume mínimo necessário. | Baixa |
 
-### 4.3 Limitações de validade de construto
+### 5.3 Limitações de validade de construto
 
 | # | Limitação | Gravidade |
 | --- | --- | --- |
 | 18 | **A conciliação foi operacionalizada como regra de limiar.** Na prática contábil, conciliar envolve julgamento profissional, conhecimento contratual e contexto de negócio que não se reduzem a tolerâncias sobre data e valor. O construto medido é mais estreito do que o construto nomeado. | Alta |
 | 19 | **Ausência de padrão-ouro independente.** Não houve rotulagem por especialista humano; o rótulo é produto do próprio sistema, o que impede medir concordância com o julgamento contábil (kappa de Cohen, por exemplo). | Alta |
-| 20 | **A classe "parcialmente conciliado" é convenção arbitrária.** Os multiplicadores 4× (data) e 5× (valor) não derivam de norma contábil nem de prática documentada. | Média |
+| 20 | ~~**A classe "parcialmente conciliado" é convenção arbitrária.**~~ **Resolvida:** a classe foi removida no experimento de comparação, que é binário — par verdadeiro contra exceção — justamente por não haver base normativa para os multiplicadores 4× e 5×. Permanece válida para o cenário `fuzzy` original. | Resolvida |
 
-### 4.4 Limitações de implementação e documentação
+### 5.4 Limitações específicas do experimento de comparação
 
 | # | Limitação | Gravidade |
 | --- | --- | --- |
-| 21 | **Divergência entre documentação e código.** O `README.md` descreve a variável `is_mesmo_municipio` (comparação de código IBGE), que **não está implementada** em `features.py`. O código utiliza `cnpj_match`, ausente da documentação. | Média — corrigir antes da entrega |
+| 24 | **A base continua sintética.** Todas as limitações de validade externa 9, 10, 11, 14, 15, 16 e 17 permanecem integralmente. O experimento demonstra que a tarefa *construída* é aprendível e que os algoritmos diferem *nela* — não que conciliação real seja aprendível. | Alta |
+| 25 | **As alíquotas de retenção são parâmetros, não afirmações normativas.** IRRF 1,5%, CSRF 4,65%, INSS 11% e o limite de R$ 5.000 estão em `config.yaml` e precisam de conferência contra a legislação vigente antes de qualquer afirmação jurídica no texto. | Alta |
+| 26 | **A dificuldade da tarefa é um parâmetro escolhido.** `hard_negative_rate: 0.30` determina quanto da base é resolvível apenas pela razão de valor. Um valor diferente moveria as três médias. O valor usado foi fixado antes de observar os resultados e não foi ajustado depois — mas isso é uma afirmação sobre o processo, não uma propriedade verificável do artefato. | Alta |
+| 27 | **A similaridade textual é acoplada à partição.** O `TfidfVectorizer` é reajustado a cada chamada de `build_features_v2`, de modo que o IDF de um registro depende de com quais outros ele foi processado — a mesma acoplagem transdutiva que o estudo critica, em escala menor. | Média |
+| 28 | **A instabilidade do SVM não foi isolada experimentalmente.** A explicação por calibração em §4.5 é uma hipótese coerente com a evidência, não um resultado controlado. Confirmá-la exigiria comparar com `ensemble=True` e com um SVM sem calibração. | Média |
+
+### 5.5 Limitações de implementação e documentação
+
+| # | Limitação | Gravidade |
+| --- | --- | --- |
+| 21 | ~~**Divergência entre documentação e código.**~~ **Resolvida:** o `README.md` descrevia `is_mesmo_municipio`, que não existe em `features.py`; a tabela agora documenta `cnpj_match`, que é o que o código usa. | Resolvida |
 | 22 | **Variável constante em produção.** `cnpj_match` assume valor 1 em 100% dos registros, sem contribuição informacional. | Baixa |
 | 23 | **Codificação por sentinela.** `delta_days = 9999` e `delta_valor_pct = 100` para ausência de correspondência distorcem a padronização e prejudicam modelos sensíveis à escala — responsável integral pela diferença entre algoritmos (§3.3). | Alta |
 
@@ -462,9 +618,9 @@ apresentação oral, antes que a banca as levante.
 
 ---
 
-## 5. Contribuições teóricas
+## 6. Contribuições teóricas
 
-**5.1 Evidência empírica quantificada de circularidade em rotulagem por regra.**
+**6.1 Evidência empírica quantificada de circularidade em rotulagem por regra.**
 O estudo documenta, com pipeline reprodutível, artefatos versionados e experimento de ablação controlado,
 um mecanismo de vazamento estruturalmente inevitável quando rótulos de conciliação são derivados de regras
 determinísticas sobre variáveis que também compõem o vetor de atributos. A contribuição não está em
@@ -474,7 +630,7 @@ dado que a esmagadora maioria das organizações só dispõe de rótulos gerados
 negócio. A queda de 1,0000 para 0,7568 e, sem os proxies, para 0,4966 de F1-macro estabelece um
 referencial numérico para o custo de ignorar essa circularidade.
 
-**5.2 Demonstração experimental de que o ranking entre algoritmos é artefato da representação.**
+**6.2 Demonstração experimental de que o ranking entre algoritmos é artefato da representação.**
 A configuração `sentinel_fixed` mostra que os três classificadores atingem desempenho idêntico e perfeito
 mediante uma única alteração de pré-processamento, sem mudança de algoritmo. Combinada à explicação
 quantitativa da seção 2.2 — a faixa informativa de `delta_days` comprimida em 0,0085 desvios-padrão —, a
@@ -482,7 +638,7 @@ evidência sustenta o deslocamento da pergunta de pesquisa: **de "qual algoritmo
 para "qual representação dos dados torna a conciliação aprendível"**. A inversão de ordem entre SVM e
 Random Forest sob `no_leak` reforça que rankings obtidos sob representação inadequada não são estáveis.
 
-**5.3 Caracterização da assimetria de custo como propriedade estrutural do domínio.**
+**6.3 Caracterização da assimetria de custo como propriedade estrutural do domínio.**
 O trabalho evidencia que classificadores otimizados para métricas simétricas erram sistematicamente na
 direção mais nociva ao controle interno (130 falsos positivos contra zero falsos negativos na linha de
 base; 250 contra zero sob `no_leak`; 50,4% dos parciais promovidos a conciliados). Isso fundamenta a
@@ -491,13 +647,13 @@ deve ser derivada do objetivo de controle, não da convenção estatística** �
 sensível a custo com estruturas normativas de controle interno, ponte pouco explorada na literatura de
 contabilidade e sistemas de informação.
 
-**5.4 Explicitação da lacuna entre conciliação e *record linkage*.**
+**6.4 Explicitação da lacuna entre conciliação e *record linkage*.**
 Ao formalizar a conciliação como problema de pareamento de registros e evidenciar que a simplificação
 1:1 elimina a geração de candidatos — núcleo do modelo de Fellegi-Sunter —, o trabalho delimita
 precisamente o que separa o experimento acadêmico da aplicação organizacional, oferecendo agenda de
 pesquisa em vez de conclusão prematura.
 
-**5.5 Contribuição metodológica sobre validação em pipelines contábeis.**
+**6.5 Contribuição metodológica sobre validação em pipelines contábeis.**
 O caso sustenta a proposição de que, em domínios de rótulo derivado de regra, **acurácia elevada deve ser
 tratada como sinal de alarme e disparar auditoria da procedência do rótulo**, e não como critério de
 aceitação. O experimento de ablação é apresentado como protocolo replicável para essa auditoria:
@@ -506,9 +662,9 @@ limite superior para o quanto o modelo realmente aprendeu.
 
 ---
 
-## 6. Contribuições práticas
+## 7. Contribuições práticas
 
-**6.1 Artefato de software reprodutível e auditável.**
+**7.1 Artefato de software reprodutível e auditável.**
 O repositório entrega pipeline completo e determinístico — simulação, ETL, engenharia de atributos,
 treinamento com busca em grade, avaliação e ablação — com parametrização integralmente externalizada em
 `config.yaml`, semente fixa, empacotamento Python e suíte de testes automatizados cobrindo os quatro
@@ -518,7 +674,7 @@ critérios de pesquisa computacional reprodutível `[VERIFICAR: Peng, R. D. "Rep
 Computational Science". Science, v. 334, n. 6060, 2011]` e é, por si, contribuição de engenharia de
 software — coerente com a natureza do MBA.
 
-**6.2 Gerador de dados sintéticos de conciliação fiscal brasileira.**
+**7.2 Gerador de dados sintéticos de conciliação fiscal brasileira.**
 Os módulos de simulação produzem planilhas de pagamento e XMLs de NFS-e aderentes ao padrão ABRASF, com
 CNPJs válidos (dígitos verificadores calculados), códigos IBGE de municípios, itens da lista de serviços
 da LC 116/2003 e quatro modos de divergência parametrizáveis. Trata-se de recurso reutilizável para
@@ -527,7 +683,7 @@ obstáculo reconhecido à pesquisa — o que dialoga com a literatura de dados s
 `[VERIFICAR: Patki, N.; Wedge, R.; Veeramachaneni, K. "The Synthetic Data Vault". In: IEEE International
 Conference on Data Science and Advanced Analytics (DSAA), 2016]`.
 
-**6.3 Checklist de diagnóstico para projetos de conciliação automatizada.**
+**7.3 Checklist de diagnóstico para projetos de conciliação automatizada.**
 Do estudo derivam verificações diretamente aplicáveis por equipes de engenharia e auditoria interna:
 
 1. Confirmar que nenhuma variável preditora participa da regra que gerou o rótulo.
@@ -544,7 +700,7 @@ Do estudo derivam verificações diretamente aplicáveis por equipes de engenhar
    exceções reais.
 7. Validar temporalmente quando os dados possuem dimensão temporal.
 
-**6.4 Evidência para decisão de investimento em automação.**
+**7.4 Evidência para decisão de investimento em automação.**
 Os resultados sustentam recomendação concreta para organizações: **quando a regra de conciliação é
 conhecida e determinística, aprendizado de máquina não agrega valor sobre a implementação direta da
 regra** — a Random Forest apenas reproduziu, com custo computacional e opacidade adicionais, aquilo que
@@ -557,7 +713,16 @@ ser preferidos em decisões de alto risco `[VERIFICAR: Rudin, C. "Stop Explainin
 Learning Models for High Stakes Decisions and Use Interpretable Models Instead". Nature Machine
 Intelligence, v. 1, 2019]`.
 
-**6.5 Arquitetura de referência em camadas.**
+**7.5 O guarda anti-vazamento como artefato reutilizável.**
+`models/leak_guard.py` ajusta uma árvore de profundidade 1 sobre cada variável isoladamente e **falha o
+pipeline** — não emite aviso — se alguma ultrapassar um teto configurável. Converte a recomendação
+"acurácia elevada deve ser tratada como sinal de alarme" em verificação executável, e roda antes de cada
+treino. É diretamente transplantável para qualquer projeto que treine sobre rótulos gerados por regras
+internas, que é a situação da maioria das organizações. O experimento de comparação o exercita em 10
+execuções (§4.2), e a §4.6 documenta um segundo modo de falha da mesma família que ele **não** captura —
+uma métrica de seleção apontada para a classe errada — delimitando o alcance do artefato.
+
+**7.6 Arquitetura de referência em camadas.**
 A separação entre simulação, ETL, modelagem e avaliação, com configuração externalizada e artefatos
 persistidos por cenário, constitui modelo transponível para implantações reais, mitigando o débito
 técnico característico de sistemas de aprendizado de máquina
@@ -566,9 +731,9 @@ Neural Information Processing Systems (NeurIPS), 2015]`.
 
 ---
 
-## 7. Agenda de pesquisa futura
+## 8. Agenda de pesquisa futura
 
-Os dois primeiros itens da agenda original **já foram executados** e integram agora a seção 3. Os
+Os itens 1, 2, 4, 6, 8 e 9 da agenda original **já foram executados** e integram as seções 3 e 4. Os
 demais permanecem em aberto, em ordem de retorno esperado:
 
 1. ~~Replicar sem as variáveis vazadas.~~ **Executado** (§3.4): F1-macro cai de 1,0000 para 0,7568 (RF,
@@ -576,27 +741,32 @@ demais permanecem em aberto, em ordem de retorno esperado:
 2. ~~Substituir a sentinela por indicador explícito.~~ **Executado** (§3.3): a diferença entre Random
    Forest e modelos de fronteira suave desaparece integralmente.
 3. **Calibrar o gerador para exercitar as tolerâncias.** Alterar as faixas de divergência para incluir o
-   intervalo de 0 a 5 dias e de 0% a 2%, tornando o cenário `fuzzy` efetivamente informativo. *É agora o
-   experimento de maior retorno, e o de menor custo.*
-4. **Introduzir sinal genuíno na simulação.** Dado que a base não contém informação aprendível além da
-   regra (§3.4), o gerador precisa produzir correlações não triviais — por exemplo, fornecedores com
-   padrões característicos de atraso, ou centros de custo associados a tipos de divergência.
+   intervalo de 0 a 5 dias e de 0% a 2%, tornando o cenário `fuzzy` efetivamente informativo. Aplica-se ao
+   experimento original; o de comparação abandonou as tolerâncias em favor da verdade de origem.
+4. ~~Introduzir sinal genuíno na simulação.~~ **Executado** (§4.1): retenções tributárias legítimas,
+   prazo característico por fornecedor e município por centro de custo. O guarda anti-vazamento confirma
+   que nenhuma variável isolada separa as classes (§4.2).
 5. **Estender ao pareamento N:M.** Modelar pares candidatos em vez de registros, incorporando geração de
    candidatos (*blocking*) e adotando o arcabouço de Fellegi-Sunter como linha de base.
-6. **Introduzir ruído textual realista.** Variações de razão social, abreviações e erros de digitação,
-   tornando a similaridade textual variável informativa em vez de ruído.
+6. ~~Introduzir ruído textual realista.~~ **Executado** (§4.1): abreviação, transposição de caracteres
+   e perda de acentuação. `similaridade_descricao` passou a ser a terceira variável mais informativa.
 7. **Validar com base real.** Convênio com organização para rotulagem por especialista e medição de
    concordância entre modelo e julgamento contábil.
-8. **Adotar seleção sensível a custo.** Definir matriz de custo explícita e otimizar o limiar de decisão,
-   reportando curvas precisão-recall por classe.
-9. **Repetir sob múltiplas sementes e aplicar testes de significância.** Estimar a variabilidade amostral
-   das métricas e comparar algoritmos com o protocolo de Demšar.
+8. ~~Adotar seleção sensível a custo.~~ **Parcialmente executado** (§4.1): o limiar é otimizado para
+   recall de exceção sob piso de precisão, e as curvas precisão-recall são reportadas. Falta a matriz de
+   custo monetário explícita, que exigiria justificar valores sem base empírica.
+9. ~~Repetir sob múltiplas sementes e aplicar testes de significância.~~ **Executado** (§4.3): 10
+   sementes, Wilcoxon pareado com correção de Holm e tamanho de efeito.
 10. **Comparar com linha de base não supervisionada.** Detecção de anomalias (*Isolation Forest*,
     *autoencoders*) dispensa rótulos e, por isso, é imune ao vazamento aqui documentado.
+11. **Isolar a causa da instabilidade do SVM.** Comparar `CalibratedClassifierCV(ensemble=True)`,
+    `ensemble=False` e SVM sem calibração, para confirmar ou refutar a hipótese de §4.5.
+12. **Varrer `hard_negative_rate`.** Mapear como a diferença entre algoritmos responde à dificuldade da
+    tarefa, transformando a limitação 26 em resultado.
 
 ---
 
-## 8. Como responder à banca
+## 9. Como responder à banca
 
 Antecipe as três perguntas prováveis. Assumir a fragilidade antes da arguição, com experimento que a
 quantifica, converte vulnerabilidade em demonstração de rigor.
@@ -618,6 +788,17 @@ quantifica, converte vulnerabilidade em demonstração de rigor.
 > ordem se inverte: o SVM supera a Random Forest. Rankings obtidos sob representação inadequada não são
 > estáveis.
 
+**"E afinal, qual algoritmo é melhor?"**
+> A Random Forest, com significância estatística — mas só depois de corrigir o desenho. No experimento
+> original a pergunta era inrespondível, porque o rótulo era função das próprias features. Refiz o
+> experimento com o rótulo vindo da verdade de origem do gerador, com sinal genuíno construído a partir
+> de retenções tributárias, e com um guarda que falha o pipeline se qualquer variável isolada separar as
+> classes. Sob esse desenho, em 10 execuções independentes, a Random Forest detecta 4,67 pontos
+> percentuais a mais de divergências que a Regressão Logística mantendo precisão de 0,90, com p = 0,0059
+> após correção de Holm. Ambas superam o SVM por mais de 48 pontos. Duas ressalvas: a diferença para a
+> regressão logística é modesta, e a regressão é interpretável, o que pode compensá-la em contexto de
+> auditoria; e o SVM não é apenas pior, é instável — seu recall varia de 6% a 34% conforme a semente.
+
 **"Qual é a utilidade prática, então?"**
 > Três resultados acionáveis. Primeiro: quando a regra de conciliação é conhecida, aprendizado de máquina
 > não agrega sobre a implementação direta da regra — sem o vazamento, o que os modelos detectam é apenas
@@ -629,7 +810,7 @@ quantifica, converte vulnerabilidade em demonstração de rigor.
 
 ---
 
-## 9. Referências sugeridas — conferir antes de citar
+## 10. Referências sugeridas — conferir antes de citar
 
 Todas as obras abaixo são reais e reconhecidas em suas áreas. **Confirme os dados bibliográficos completos
 em base indexada e formate conforme ABNT NBR 6023 antes de incluí-las.** Não cite o que não tiver
@@ -678,7 +859,7 @@ consultado.
 
 ---
 
-## Anexo — Reprodução do experimento de ablação
+## Anexo A — Reprodução do experimento de ablação
 
 ```bash
 python run_ablation.py
@@ -694,3 +875,30 @@ ablation_summary.csv                  # 24 execuções (4 configurações × 2 c
 
 Os artefatos do experimento principal em `data/results/exact/` e `data/results/fuzzy/` não são
 modificados.
+
+---
+
+## Anexo B — Reprodução do experimento de comparação
+
+```bash
+python run_comparison.py --seeds 2    # ensaio rápido
+python run_comparison.py              # completo: 10 sementes
+```
+
+Saídas em `data/results/comparison/`:
+
+```text
+per_seed_metrics.csv     # 30 linhas: 10 sementes × 3 algoritmos
+wilcoxon.csv             # 3 comparações: p bruto, p corrigido (Holm), tamanho de efeito
+decision_summary.csv     # tabela final, com n_seeds_applicable
+leak_guard_report.csv    # acurácia do toco por variável, por semente
+pr_curves.png            # curvas precisão-recall da classe de exceção (primeira semente)
+recall_boxplot.png       # dispersão do recall de exceção entre as 10 sementes
+```
+
+O guarda anti-vazamento roda antes de cada treino e **interrompe a execução** se qualquer variável
+isolada ultrapassar `leak_guard_max_stump_accuracy` (0,95). Se isso ocorrer, a correção é aumentar a
+sobreposição entre classes no gerador — nunca remover a variável acusada, que foi exatamente o que a
+configuração `no_leak` da ablação mostrou ser destrutivo.
+
+Os artefatos do experimento principal e da ablação não são modificados.

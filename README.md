@@ -102,7 +102,28 @@ models/
 | `ValorIss` | ISS tax from NFS-e |
 | `Aliquota` | ISS rate |
 | `descricao_similarity` | TF-IDF cosine similarity between payment description and NFS-e discriminação |
-| `is_mesmo_municipio` | Boolean: IBGE municipality code matches company |
+| `cnpj_match` | Boolean: supplier CNPJ present (constant in practice — see the discussion document) |
+
+## Algorithm Comparison (leak-free)
+
+The main experiment above cannot answer which algorithm is best: its label is a deterministic threshold
+over two of its own features, so the models recover the labeling rule rather than learning. `run_ablation.py`
+quantifies that, and `run_comparison.py` is the corrective experiment that does answer the question.
+
+```bash
+python run_ablation.py                # 4 feature configurations x 2 scenarios x 3 algorithms
+python run_comparison.py --seeds 2    # dry run
+python run_comparison.py              # full: 10 seeds
+```
+
+In the comparison experiment the label comes from generator ground truth rather than from a threshold
+rule, so it measures the algorithms and not the labeling. True pairs are derived from their invoices by a
+legal transformation — Brazilian withholding taxes and a per-supplier payment term — so a value gap no
+longer implies a mismatch. A leak guard fails the run if any single feature separates the classes.
+Selection is by exception recall under precision >= 0.90, with the threshold chosen on validation, and
+algorithms are compared across seeds with a paired Wilcoxon test and Holm correction.
+
+Results, discussion and limitations: [`docs/discussao-limitacoes-contribuicoes.md`](docs/discussao-limitacoes-contribuicoes.md).
 
 ## Tests
 
