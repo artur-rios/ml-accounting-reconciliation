@@ -15,5 +15,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     config = load_config(args.config)
-    total = args.seeds or config["comparison"]["n_seeds"]
+
+    if args.seeds is not None and args.seeds <= 0:
+        parser.error(f"--seeds must be a positive integer, got {args.seeds}")
+
+    if "comparison" not in config:
+        parser.error(
+            f"{args.config} has no 'comparison' block; add one before running "
+            "the algorithm comparison."
+        )
+
+    total = args.seeds if args.seeds is not None else config["comparison"]["n_seeds"]
     run(config, total, Path(args.output))

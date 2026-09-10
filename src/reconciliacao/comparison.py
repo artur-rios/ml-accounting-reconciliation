@@ -14,7 +14,7 @@ from sklearn.model_selection import train_test_split
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402  (backend must be set first)
-from sklearn.metrics import PrecisionRecallDisplay  # noqa: E402
+from sklearn.metrics import PrecisionRecallDisplay, average_precision_score  # noqa: E402
 
 from reconciliacao.etl.truth_labeler import label_from_truth
 from reconciliacao.models.comparison_stats import paired_comparisons
@@ -77,11 +77,16 @@ def run_seed(cfg: dict, seed: int) -> tuple[list[dict], pd.Series, dict[str, tup
 
         threshold = choose_threshold(y_val, proba_val, cmp_cfg["min_precision"])
         if threshold is None:
+            # pr_auc_excecao is threshold-free (a ranking metric over the full
+            # score, not a decision at a cut point), so it is still computable
+            # here even though no operating point meets the precision floor.
+            is_exception_test = (y_te.to_numpy() == 0).astype(int)
+            pr_auc = float(average_precision_score(is_exception_test, proba_test))
             rows.append({
                 "seed": seed, "algorithm": name, "threshold": None,
                 "precisao_validacao": None, "recall_excecao": 0.0,
                 "precisao_excecao": 0.0, "taxa_encaminhamento": 0.0,
-                "pr_auc_excecao": float("nan"), "f1_macro": float("nan"),
+                "pr_auc_excecao": pr_auc, "f1_macro": float("nan"),
             })
             continue
 
@@ -151,6 +156,7 @@ def run(cfg: dict, n_seeds: int, output_dir: Path) -> pd.DataFrame:
             precisao_excecao_media=("precisao_excecao", "mean"),
             taxa_encaminhamento_media=("taxa_encaminhamento", "mean"),
             pr_auc_media=("pr_auc_excecao", "mean"),
+            n_seeds_applicable=("threshold", "count"),
         )
         .sort_values("recall_excecao_medio", ascending=False)
     )

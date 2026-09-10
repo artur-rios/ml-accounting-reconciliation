@@ -96,6 +96,6 @@ def comparison_config():
         "split": {"train": 0.60, "val": 0.20, "test": 0.20},
         "min_precision": 0.90,
         "cv_folds": 2,
-        "scoring": "average_precision",
+        "scoring": "average_precision_excecao",
         "leak_guard_max_stump_accuracy": 0.95,
     }
