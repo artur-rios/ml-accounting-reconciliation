@@ -457,6 +457,10 @@ isolada foi **0,8173**.
 | `desvio_prazo_fornecedor` | 0,7711 |
 | `delta_dias` | 0,7429 |
 
+As seis mais informativas de catorze. As oito restantes ficam em 0,7302 ou abaixo, e sete delas — os
+indicadores `compat_*` e `acima_limite_csrf` — marcam exatamente 0,70, a taxa da classe majoritária: um
+exemplo vivo do que o guarda não consegue enxergar.
+
 Nenhuma variável separa as classes sozinha, e as mais informativas são evidências de nível de par, não a
 própria regra de rotulagem. A tarefa submetida aos algoritmos é genuína.
 
@@ -476,7 +480,8 @@ Dez bases independentes, 7.500 registros cada, três algoritmos, mesma divisão 
 | Regressão Logística | 0,7698 | 0,0251 | 0,9030 | 25,59% | 0,9153 | 10/10 |
 
 Os três atingiram o piso de precisão na validação em todas as dez execuções. A precisão **de teste** fica
-ligeiramente abaixo de 0,90 — 0,893 para a Random Forest — o que é esperado e desejável: o limiar foi
+ligeiramente abaixo de 0,90 para a Random Forest (0,893) e para o SVM (0,900), e acima para a Regressão
+Logística (0,903) — o que é esperado e desejável: o limiar foi
 calibrado na validação e aplicado ao teste sem reajuste. Uma precisão de teste exatamente no piso seria
 indício de que o teste havia sido usado na calibração.
 
@@ -597,9 +602,9 @@ detectado dois dos três.
 
 **Ressalva de honestidade.** O artefato foi reduzido, não eliminado. Com cinco pagamentos por fornecedor,
 uma linha de treino contribui para a mediana do próprio fornecedor, de modo que seu desvio é encolhido em
-relação ao de uma linha de teste: desvio-padrão 12,6 no treino contra 19,0 no teste. É o mesmo mecanismo
-em amplitude muito menor — as linhas extremas de teste ficam perto de |z| ≈ 5,5, uma cauda fina, não o
-grosso da distribuição. Uma mediana *leave-one-out*, ou mais pagamentos por fornecedor, removeria o
+relação ao de uma linha de teste: na configuração de 7.500 registros, desvio-padrão de cerca de 13,8 no
+treino contra 18,5 no teste. É o mesmo mecanismo em amplitude muito menor — as linhas extremas ficam
+perto de |z| ≈ 5, uma cauda fina, não os 83,75% que colapsaram o núcleo. Uma mediana *leave-one-out*, ou mais pagamentos por fornecedor, removeria o
 resíduo. Fica registrado como limitação 27.
 
 ### 4.7 Achado anterior: a métrica de seleção apontava para a classe errada
@@ -645,8 +650,8 @@ apresentação oral, antes que a banca as levante.
 | 3 | **Métricas saturadas.** Com acurácia unitária, os intervalos de confiança colapsam e a comparação entre algoritmos perde poder estatístico. | Alta | `metrics_summary.csv`, dp de CV = 0,0000 |
 | 4 | ~~**Ausência de teste de significância.**~~ **Resolvida em §4.3:** Wilcoxon pareado sobre 10 sementes com correção de Holm, tamanho de efeito reportado ao lado do p. Permanece válida para o experimento original e para a ablação. | Resolvida | `comparison_stats.py`; `wilcoxon.csv` |
 | 5 | **Validação cruzada não temporal.** Os dados possuem dimensão temporal (datas de pagamento e emissão), mas o `StratifiedKFold` embaralha os registros, permitindo treino com informação posterior ao teste. | Média | `trainer.py:80` |
-| 6 | **Métrica de seleção inadequada ao domínio.** `f1_macro` trata falsos positivos e falsos negativos como equivalentes, contrariando a assimetria de custo da conciliação. **Corrigida no experimento de comparação** (§4.1), que seleciona por recall de exceção sob piso de precisão — mas ver §4.6: a orientação do scorer precisou ser verificada empiricamente. | Média | `config.yaml`, `scoring: f1_macro` |
-| 7 | ~~**Semente única.**~~ **Resolvida em §4.3:** o experimento de comparação roda 10 bases independentes e reporta desvio-padrão entre sementes — que revelou a bimodalidade do SVM (§4.5). Permanece válida para o experimento original e para a ablação. | Resolvida | `run_comparison.py`; `per_seed_metrics.csv` |
+| 6 | **Métrica de seleção inadequada ao domínio.** `f1_macro` trata falsos positivos e falsos negativos como equivalentes, contrariando a assimetria de custo da conciliação. **Corrigida no experimento de comparação** (§4.1), que seleciona por recall de exceção sob piso de precisão — mas ver §4.7: a orientação do scorer precisou ser verificada empiricamente. | Média | `config.yaml`, `scoring: f1_macro` |
+| 7 | ~~**Semente única.**~~ **Resolvida em §4.3:** o experimento de comparação roda 10 bases independentes e reporta desvio-padrão entre sementes — que expôs, na primeira versão, a instabilidade do SVM depois rastreada até o artefato de escala de §4.6. Permanece válida para o experimento original e para a ablação. | Resolvida | `run_comparison.py`; `per_seed_metrics.csv` |
 | 8 | **Importância por impureza.** Método enviesado para variáveis contínuas; não foram calculadas importâncias por permutação. | Baixa | `evaluator.py` |
 
 ### 5.2 Limitações de validade externa
@@ -656,7 +661,7 @@ apresentação oral, antes que a banca as levante.
 | 9 | **Dados inteiramente sintéticos.** Nenhum registro contábil real foi utilizado; a distribuição conjunta das variáveis reflete as decisões do gerador, não a realidade empresarial. | Alta |
 | 10 | **Correspondência 1:1 por construção.** CNPJs únicos por pagamento e uma NFS-e por pagamento eliminam o cenário N:M (um pagamento para várias notas, pagamentos parcelados), que é dominante na prática. | Alta |
 | 11 | **Janelas de tolerância vazias.** O gerador produz divergências de 6-30 dias e 3-20%, fora das tolerâncias de ±5 dias e ±2%; o cenário `fuzzy` não exercitou a tolerância que se propunha a testar. | Alta |
-| 12 | ~~**Ausência de ruído textual realista.**~~ **Resolvida no experimento de comparação** (§4.1), onde a descrição do pagamento é derivada da discriminação da nota por abreviação, transposição de caracteres e perda de acentuação, e `similaridade_descricao` passa a carregar sinal genuíno (0,787 de acurácia isolada, §4.2). Permanece válida para o experimento original. Texto original: Razões sociais, descrições e discriminações são geradas independentemente; não há abreviações, erros de digitação, grafias alternativas ou variação de nomenclatura — exatamente o ruído que motiva o uso de similaridade textual. | Resolvida |
+| 12 | ~~**Ausência de ruído textual realista.**~~ **Resolvida no experimento de comparação** (§4.1), onde a descrição do pagamento é derivada da discriminação da nota por abreviação, transposição de caracteres e perda de acentuação, e `similaridade_descricao` passa a carregar sinal genuíno (0,785 de acurácia isolada, §4.2). Permanece válida para o experimento original. Texto original: Razões sociais, descrições e discriminações são geradas independentemente; não há abreviações, erros de digitação, grafias alternativas ou variação de nomenclatura — exatamente o ruído que motiva o uso de similaridade textual. | Resolvida |
 | 13 | **Ausência de sinal aprendível residual.** Removido o vazamento, a base não contém informação suficiente para a tarefa (§3.4), o que impede generalizar qualquer conclusão sobre viabilidade de aprendizado supervisionado em conciliação. | Alta |
 | 14 | **Taxa de conciliação fixa em 70%.** Parâmetro arbitrário, não calibrado por evidência empírica sobre taxas reais de conciliação em contas a pagar. | Média |
 | 15 | **Escopo restrito a NFS-e.** Apenas notas de serviço no padrão ABRASF; NF-e de mercadorias, notas de importação e documentos não fiscais ficaram fora. | Média |
@@ -678,7 +683,7 @@ apresentação oral, antes que a banca as levante.
 | 24 | **A base continua sintética.** Todas as limitações de validade externa 9, 10, 11, 14, 15, 16 e 17 permanecem integralmente. O experimento demonstra que a tarefa *construída* é aprendível e que os algoritmos diferem *nela* — não que conciliação real seja aprendível. | Alta |
 | 25 | **As alíquotas de retenção são parâmetros, não afirmações normativas.** IRRF 1,5%, CSRF 4,65%, INSS 11% e o limite de R$ 5.000 estão em `config.yaml` e precisam de conferência contra a legislação vigente antes de qualquer afirmação jurídica no texto. | Alta |
 | 26 | **A dificuldade da tarefa é um parâmetro escolhido.** `hard_negative_rate: 0.30` determina quanto da base é resolvível apenas pela razão de valor. Um valor diferente moveria as três médias. O valor usado foi fixado antes de observar os resultados e não foi ajustado depois — mas isso é uma afirmação sobre o processo, não uma propriedade verificável do artefato. | Alta |
-| 27 | **Resíduo do artefato de escala em `desvio_prazo_fornecedor`.** Com cinco pagamentos por fornecedor, uma linha de treino contribui para a mediana do próprio fornecedor e tem o desvio encolhido em relação a uma linha de teste: desvio-padrão 12,6 no treino contra 19,0 no teste. É o mesmo mecanismo de §4.6 em amplitude muito menor, mas não é zero. Uma mediana *leave-one-out* o eliminaria. | Média |
+| 27 | **Resíduo do artefato de escala em `desvio_prazo_fornecedor`.** Com cinco pagamentos por fornecedor, uma linha de treino contribui para a mediana do próprio fornecedor e tem o desvio encolhido em relação a uma linha de teste: na configuração de 7.500 registros, desvio-padrão de cerca de 13,8 no treino contra 18,5 no teste, com as linhas extremas em |z| ≈ 5. É o mesmo mecanismo de §4.6 em amplitude muito menor, mas não é zero. Uma mediana *leave-one-out* o eliminaria. | Média |
 | 28 | **A similaridade textual é acoplada à partição.** O `TfidfVectorizer` é reajustado a cada chamada de `build_features_v2`, de modo que o IDF de um registro depende de com quais outros ele foi processado — a mesma acoplagem transdutiva que o estudo critica, em escala menor. Como consequência, `similaridade_descricao` não é computável para um registro novo isolado em inferência. | Média |
 | 29 | **O guarda anti-vazamento só enxerga um modo de falha.** Ele detecta variáveis que predizem o rótulo *bem demais*. Não detecta variáveis constantes no treino, nem incompatibilidade de escala entre partições — que foram exatamente os defeitos de §4.6. A suíte ganhou asserções para esses casos, mas a lista de verificações continua sendo enumerada por descoberta, não por construção. | Alta |
 
