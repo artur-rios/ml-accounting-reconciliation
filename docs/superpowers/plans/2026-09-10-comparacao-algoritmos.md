@@ -616,6 +616,26 @@ git commit -m "feat: ground-truth dataset generator for the comparison experimen
 
 ---
 
+> **Revisão pós-implementação (2026-09-10, commit `223ef1c`).** A revisão da Task 2 encontrou quatro
+> problemas no texto desta task, e o autor decidiu que os findings prevalecem sobre o plano. O código
+> entregue difere do que está escrito acima, deliberadamente:
+>
+> 1. Pares verdadeiros agora recebem memo não relacionado numa fração dos casos
+>    (`atypical_description_rate: 0.12`). Antes, "descrição não relacionada" era regra de precisão 100%
+>    para negativos, e um atalho de duas features chegava a ~97% de acurácia.
+> 2. Os offsets de prazo das duas classes vinham de listas disjuntas, tornando vários valores de
+>    `delta_dias` exclusivos de uma classe — memorizáveis por uma árvore profunda e invisíveis ao guarda
+>    anti-vazamento, que só olha features isoladas. Agora ambas as classes sorteiam de `term_shift_range`
+>    por um helper compartilhado, e as classes diferem apenas na frequência.
+> 3. `term_shift_range`, `atypical_description_rate`, `invoice_value_range_brl` e `iss_rate_range_pct`
+>    foram promovidos a `config.yaml`, atendendo à Global Constraint. `_LC116_CODES`, `_MUNICIPIOS`, a
+>    faixa de centros de custo e os internos de `_corrupt_text` permanecem constantes de módulo por
+>    decisão explícita — são vocabulário de domínio, não parâmetros de sobreposição.
+> 4. Quatro testes de sobreposição foram acrescentados: município, descrição, variação do subconjunto
+>    corrompido e interseção de `delta_dias` entre classes.
+
+---
+
 ### Task 3: Rotulagem pela verdade de origem
 
 **Files:**
