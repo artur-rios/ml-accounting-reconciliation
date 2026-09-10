@@ -26,3 +26,23 @@ models:
   cv_folds: 5
   scoring: f1_macro
   test_size: 0.20
+
+comparison:
+  n_seeds: 10
+  n_records: 7500
+  match_rate: 0.70              # fração de pagamentos com par verdadeiro
+  hard_negative_rate: 0.30      # fração DOS NÃO-PARES que são hard negatives (não do total)
+  atypical_term_rate: 0.10      # fração dos pares verdadeiros que fogem do prazo do fornecedor
+  same_municipality_rate: 0.85  # fração dos pares verdadeiros com centro de custo no município da nota
+  payment_terms_days: [0, 15, 30, 45, 60]
+  csrf_threshold_brl: 5000.0
+  retention_rates:              # em pontos percentuais do valor dos serviços
+    irrf: 1.50
+    csrf: 4.65
+    inss: 11.00
+  retention_tolerance_pp: 0.05  # tolerância em PONTOS PERCENTUAIS para compat_* e p/ definir hard
+  split: { train: 0.60, val: 0.20, test: 0.20 }
+  min_precision: 0.90
+  cv_folds: 5
+  scoring: average_precision
+  leak_guard_max_stump_accuracy: 0.95

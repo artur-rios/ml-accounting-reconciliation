@@ -74,3 +74,24 @@ def sample_nfse_clean():
         "nfse_cnpj_valid": [True, True, False],
         "is_duplicate": [False, False, False],
     })
+
+
+@pytest.fixture
+def comparison_config():
+    return {
+        "n_seeds": 2,
+        "n_records": 400,
+        "match_rate": 0.70,
+        "hard_negative_rate": 0.30,
+        "atypical_term_rate": 0.10,
+        "same_municipality_rate": 0.85,
+        "payment_terms_days": [0, 15, 30, 45, 60],
+        "csrf_threshold_brl": 5000.0,
+        "retention_rates": {"irrf": 1.50, "csrf": 4.65, "inss": 11.00},
+        "retention_tolerance_pp": 0.05,
+        "split": {"train": 0.60, "val": 0.20, "test": 0.20},
+        "min_precision": 0.90,
+        "cv_folds": 2,
+        "scoring": "average_precision",
+        "leak_guard_max_stump_accuracy": 0.95,
+    }
