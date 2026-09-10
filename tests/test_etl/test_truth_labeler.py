@@ -207,3 +207,26 @@ def test_non_numeric_invoice_number_matches_correctly():
     ] = "NF-2026-B"
     out_miss = label_from_truth(pag, nfse, verdade_miss)
     assert out_miss.loc[out_miss["id_pagamento"] == "PAG-000003", "label"].iloc[0] == 0
+
+
+def test_large_invoice_numbers_are_not_collapsed_by_float_precision():
+    """Two distinct 18-digit invoice numbers must not canonicalise to the same key.
+
+    float() only carries 53 bits of mantissa, so
+    int(float("100000000000000001")) == int(float("100000000000000002")).
+    A non-pair whose candidate happens to carry one of these large numbers
+    must not be swept into a false match against the truth value.
+    """
+    pag, nfse = _fixtures()
+    nfse = nfse.copy()
+    nfse.loc[nfse["nfse_cnpj_prestador"] == "44555666000195", "nfse_numero"] = (
+        "100000000000000002"
+    )
+    verdade = pd.DataFrame({
+        "id_pagamento": ["PAG-000001", "PAG-000002"],
+        "nfse_numero": ["000001", "100000000000000001"],
+        "tipo_negativo": ["", "hard"],
+    })
+
+    out = label_from_truth(pag, nfse, verdade)
+    assert out.loc[out["id_pagamento"] == "PAG-000002", "label"].iloc[0] == 0

@@ -5,8 +5,11 @@ quantity -- date delta, value ratio, text similarity -- takes part in it.
 """
 
 import math
+import re
 
 import pandas as pd
+
+_INTEGER_RE = re.compile(r"[+-]?\d+")
 
 
 def _normalize_numero(valores: pd.Series) -> pd.Series:
@@ -21,6 +24,15 @@ def _normalize_numero(valores: pd.Series) -> pd.Series:
     ``""``, whitespace and the literal string ``"nan"`` to the empty string.
     A value that does not parse as numeric survives as its stripped self,
     since invoice numbers are not guaranteed to be digits forever.
+
+    A pure integer string (optionally signed) is compared exactly via
+    ``int()``, at arbitrary precision -- never routed through ``float()``.
+    ``float`` only has 53 bits of mantissa, so two distinct 16+ digit
+    invoice numbers can round to the same ``float`` and collapse onto the
+    same key, producing a false match. The ``float`` path below is reserved
+    for genuinely non-integer numeric forms such as ``"1.0"`` or ``"1e3"``,
+    which still need to canonicalise to ``"1"`` and ``"1000"``. Do not
+    reintroduce ``int(float(texto))`` for the integer case.
     """
 
     def canonical(valor) -> str:
@@ -29,10 +41,17 @@ def _normalize_numero(valores: pd.Series) -> pd.Series:
         texto = str(valor).strip()
         if texto == "" or texto.lower() == "nan":
             return ""
+        if _INTEGER_RE.fullmatch(texto):
+            return str(int(texto))
         try:
-            return str(int(float(texto)))
+            numero = float(texto)
         except (ValueError, OverflowError):
             return texto
+        if math.isnan(numero) or math.isinf(numero):
+            return texto
+        if numero.is_integer():
+            return str(int(numero))
+        return texto
 
     return valores.map(canonical)
 
