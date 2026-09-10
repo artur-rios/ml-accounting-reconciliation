@@ -35,7 +35,19 @@ def _delta_dias(df: pd.DataFrame) -> pd.Series:
 
 
 def fit_supplier_terms(df_train: pd.DataFrame) -> tuple[dict[str, float], float]:
-    """Median payment term per supplier, fitted on the training partition only."""
+    """Median payment term per supplier, fitted on the training partition only.
+
+    An empty training frame cannot produce a global median and signals a
+    programming error in the caller's split logic, not a legitimate data
+    scenario, so it is rejected rather than silently producing a NaN
+    fallback that would poison every row's `desvio_prazo_fornecedor`.
+    """
+    if len(df_train) == 0:
+        raise ValueError(
+            "fit_supplier_terms recebeu uma partição de treino vazia; "
+            "isso indica um erro no split treino/teste (não um cenário de "
+            "dados legítimo), pois a mediana global não pode ser calculada."
+        )
     delta = _delta_dias(df_train)
     por_fornecedor = delta.groupby(df_train["cnpj_fornecedor"]).median()
     return por_fornecedor.to_dict(), float(delta.median())
@@ -53,10 +65,29 @@ def build_features_v2(
     limite = cmp_cfg["csrf_threshold_brl"]
 
     df = df.reset_index(drop=True)
-    feat = pd.DataFrame(index=df.index)
 
     valor_servicos = df["nfse_valor_servicos"].astype(float)
     valor_pago = df["valor_pago"].astype(float)
+
+    # `nfse_valor_servicos` is guaranteed strictly positive by the upstream
+    # generator, and the labeler inner-joins on it, so a non-positive or
+    # missing value here means an upstream invariant has already broken.
+    # A sentinel substitution (e.g. filling with 0 or a magic constant)
+    # would repeat the `delta_days = 9999` mistake this project exists to
+    # correct: it would hide the break and corrupt the feature scale
+    # instead of surfacing it. Fail loudly so the break is diagnosable.
+    invalido = valor_servicos.isna() | (valor_servicos <= 0)
+    if invalido.any():
+        ids_invalidos = df.loc[invalido, "id_pagamento"].tolist()
+        total = len(ids_invalidos)
+        amostra = ids_invalidos[:5]
+        raise ValueError(
+            "nfse_valor_servicos deve ser estritamente positivo e não nulo "
+            f"para todo pagamento pareado; {total} pagamento(s) violam essa "
+            f"invariante, incluindo: {amostra}"
+        )
+
+    feat = pd.DataFrame(index=df.index)
 
     feat["delta_dias"] = _delta_dias(df)
     feat["razao_valor"] = valor_pago / valor_servicos

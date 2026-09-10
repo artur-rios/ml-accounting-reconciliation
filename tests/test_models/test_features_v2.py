@@ -1,3 +1,5 @@
+import datetime
+
 import pandas as pd
 import pytest
 
@@ -89,3 +91,58 @@ def test_text_similarity_is_higher_for_matching_descriptions():
     terms, global_term = fit_supplier_terms(df)
     X, _ = build_features_v2(df, CFG, terms, global_term)
     assert X.loc[0, "similaridade_descricao"] > X.loc[2, "similaridade_descricao"]
+
+
+def test_nonpositive_valor_servicos_raises_with_offending_ids():
+    """A zero/missing nfse_valor_servicos means an upstream invariant broke;
+    build_features_v2 must fail loudly rather than divide into inf/NaN."""
+    df = _frame()
+    df.loc[1, "nfse_valor_servicos"] = 0.0
+    df.loc[2, "nfse_valor_servicos"] = None
+    terms, global_term = fit_supplier_terms(_frame())
+
+    with pytest.raises(ValueError) as exc_info:
+        build_features_v2(df, CFG, terms, global_term)
+
+    message = str(exc_info.value)
+    assert "PAG-000002" in message
+    assert "PAG-000003" in message
+
+
+def test_delta_dias_handles_raw_date_objects_and_iso_strings():
+    """data_pagamento arrives as datetime.date while nfse_data_emissao
+    arrives as an ISO-8601 string; both must resolve to the same delta."""
+    df = _frame()
+    df["data_pagamento"] = [
+        datetime.date(2026, 2, 14),
+        datetime.date(2026, 3, 2),
+        datetime.date(2026, 1, 20),
+    ]
+    df["nfse_data_emissao"] = [
+        "2026-01-15T00:00:00",
+        "2026-01-31T00:00:00",
+        "2026-01-20T00:00:00",
+    ]
+    terms, global_term = fit_supplier_terms(df)
+    X, _ = build_features_v2(df, CFG, terms, global_term)
+
+    assert X.loc[0, "delta_dias"] == pytest.approx(30.0)
+    assert X.loc[1, "delta_dias"] == pytest.approx(30.0)
+    assert X.loc[2, "delta_dias"] == pytest.approx(0.0)
+
+
+def test_fit_supplier_terms_rejects_empty_training_frame():
+    """An empty training partition is a programming error in the split,
+    not a legitimate scenario: delta.median() on it would be NaN and
+    would silently poison desvio_prazo_fornecedor for every row."""
+    empty = _frame().iloc[0:0]
+    with pytest.raises(ValueError):
+        fit_supplier_terms(empty)
+
+
+def test_fit_supplier_terms_handles_single_row_training_frame():
+    """A single-row training frame is legitimate and must work."""
+    single = _frame().iloc[[0]]
+    terms, global_term = fit_supplier_terms(single)
+    assert terms == {"11222333000181": 30.0}
+    assert global_term == pytest.approx(30.0)
