@@ -794,6 +794,17 @@ git commit -m "feat: label reconciliation pairs from generator ground truth"
 
 ---
 
+> **Revisão pós-implementação (2026-09-10, commits `5e1bae0`, `296a3f9`).** O código de referência desta
+> task comparava os números de nota como strings cruas. Depois de um round-trip por CSV o pandas infere
+> tipo numérico (`"000001"` vira `1.0`), os dois lados deixam de bater e **todo par verdadeiro seria
+> rotulado 0** — corrompendo em silêncio a verdade de origem de que o experimento inteiro depende. O
+> código entregue normaliza ambos os lados por um helper compartilhado antes de comparar. Strings de
+> inteiro puro são convertidas com `int()` direto, nunca por `float()`: a primeira tentativa de correção
+> usava `int(float(x))` e fazia dois números de 18 dígitos colidirem na mesma chave, produzindo um falso
+> par — a mesma corrupção silenciosa na direção oposta.
+
+---
+
 ### Task 4: Features de evidência
 
 **Files:**
