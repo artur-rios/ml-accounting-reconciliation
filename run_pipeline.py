@@ -1,4 +1,5 @@
 import argparse
+from datetime import date
 from pathlib import Path
 
 from reconciliacao.etl.cleaner import clean_nfse, clean_pagamentos
@@ -7,9 +8,24 @@ from reconciliacao.etl.loader import load_nfse, load_pagamentos
 from reconciliacao.models.evaluator import evaluate_all
 from reconciliacao.models.features import build_features
 from reconciliacao.models.trainer import train_all
-from reconciliacao.simulation.excel_generator import generate_payment_records, write_excel
+from reconciliacao.simulation.excel_generator import (
+    DEFAULT_REFERENCE_DATE,
+    generate_payment_records,
+    write_excel,
+)
 from reconciliacao.simulation.xml_generator import generate_nfse, write_xml
 from reconciliacao.utils.config import load_config
+
+
+def _reference_date(sim: dict) -> date:
+    """Anchor for the simulated date window, from config.
+
+    PyYAML already parses an unquoted ISO date into a `date`, but the key may
+    also arrive as a string, and its absence must not silently fall back to
+    the wall clock -- that fallback was the defect.
+    """
+    valor = sim.get("reference_date", DEFAULT_REFERENCE_DATE)
+    return valor if isinstance(valor, date) else date.fromisoformat(str(valor))
 
 
 def run(scenario: str, cfg: dict) -> None:
@@ -21,9 +37,12 @@ def run(scenario: str, cfg: dict) -> None:
     results_dir = Path(f"data/results/{scenario}")
 
     print(f"[1/5] Simulating {sim['n_records']} records...")
-    df_pag = generate_payment_records(sim["n_records"], sim["random_seed"])
+    reference_date = _reference_date(sim)
+    df_pag = generate_payment_records(sim["n_records"], sim["random_seed"], reference_date)
     write_excel(df_pag, raw_dir / "pagamentos.xlsx")
-    df_nfse_sim = generate_nfse(df_pag, sim["conciliation_rate"], sim["random_seed"])
+    df_nfse_sim = generate_nfse(
+        df_pag, sim["conciliation_rate"], sim["random_seed"], reference_date
+    )
     write_xml(df_nfse_sim, raw_dir / "nfse.xml")
 
     print("[2/5] Running ETL...")

@@ -16,7 +16,7 @@ feature on every training row.
 """
 
 import random
-from datetime import timedelta
+from datetime import date, timedelta
 
 import pandas as pd
 from faker import Faker
@@ -26,6 +26,30 @@ from reconciliacao.utils.cnpj import generate_cnpj
 
 _LC116_CODES = ["1.01", "1.02", "1.03", "1.04", "1.05", "7.01", "7.02", "14.01"]
 _MUNICIPIOS = ["3550308", "3304557", "4106902", "2304400", "5300108"]
+
+# Issue dates were drawn from a window anchored on the wall clock
+# (``date_between(start_date="-1y", end_date="-2m")``), so the generated base
+# depended on the day it was produced. It is pinned to a reference date
+# instead. No feature reads an absolute date -- delta_dias and
+# desvio_prazo_fornecedor are differences, and the payment date is the issue
+# date plus a term drawn separately -- so only the *width* of the window
+# reaches the results, through the single draw Faker makes inside it. The
+# width is preserved exactly, and the pinning was verified to leave every
+# reported metric bit-identical.
+#
+# That width is 365 days, and the reason is worth recording. Faker reads
+# ``"-2m"`` as two *minutes*: in its relative-date grammar lowercase ``m`` is
+# minutes and months are uppercase ``M``. The end of the window was therefore
+# the reference date itself, never the two-month gap the token was written to
+# express, and invoices could be issued right up to the edge of the window
+# with payment terms carrying their payments past it. Widening the gap to the
+# intended two months changes the draw and moves every published metric, so
+# the effective behaviour is reproduced here and the discrepancy is reported
+# in the write-up rather than silently corrected.
+DEFAULT_REFERENCE_DATE = date(2026, 6, 14)
+_WINDOW_START_DAYS = 365   # oldest issue date, relative to the reference
+_WINDOW_END_DAYS = 0       # newest: the reference date, as "-2m" resolved to
+
 _ACCENTS = str.maketrans("áàâãéêíóôõúüç", "aaaaeeiooouuc")
 
 
@@ -73,20 +97,32 @@ def _shifted_term(rng: random.Random, term: int, shift_range: list[int]) -> int:
     supplier whose own term is already 0 and the draw is non-positive) --
     otherwise the configured atypical rate would silently under-deliver for
     those suppliers.
+
+    The redraw is bounded rather than unconditional: a ``shift_range`` that
+    cannot produce any value other than ``term`` (``[0, 0]``, or any range
+    whose every draw clamps back to a term of 0) would otherwise spin
+    forever, turning a configuration mistake into a hang instead of a
+    result. After the budget is spent the supplier's own term is returned,
+    which under-delivers the atypical rate -- but visibly, in the generated
+    data, rather than by never returning.
     """
-    new_term = term
-    while new_term == term:
+    for _ in range(200):
         new_term = max(0, term + rng.randint(shift_range[0], shift_range[1]))
-    return new_term
+        if new_term != term:
+            return new_term
+    return term
 
 
 def generate_comparison_dataset(
-    config: dict, seed: int
+    config: dict, seed: int, reference_date: date = DEFAULT_REFERENCE_DATE
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Return (df_pagamentos, df_nfse, df_verdade) for one seed."""
     rng = random.Random(seed)
     Faker.seed(seed)
     fake = Faker("pt_BR")
+
+    janela_inicio = reference_date - timedelta(days=_WINDOW_START_DAYS)
+    janela_fim = reference_date - timedelta(days=_WINDOW_END_DAYS)
 
     n = config["n_records"]
     rates = config["retention_rates"]
@@ -135,7 +171,7 @@ def generate_comparison_dataset(
     for i, cnpj in enumerate(supplier_assignment):
         service_value = round(rng.uniform(*config["invoice_value_range_brl"]), 2)
         tax_rate = round(rng.uniform(*config["iss_rate_range_pct"]), 2)
-        issue_date = fake.date_between(start_date="-1y", end_date="-2m")
+        issue_date = fake.date_between(start_date=janela_inicio, end_date=janela_fim)
         description = fake.bs()
         invoice_number = f"{i + 1:06d}"
         iss_amount = round(service_value * tax_rate / 100, 2)

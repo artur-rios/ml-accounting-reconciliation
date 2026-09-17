@@ -1,3 +1,11 @@
+"""Simulate the NFS-e side of the ledger, in the ABRASF exchange format.
+
+The ghost-invoice branch drew its issue date from a window anchored on the
+wall clock, which made the generated file depend on the day it was produced.
+It is anchored to an explicit reference date instead, for the reason set out
+in `excel_generator`.
+"""
+
 import random
 from datetime import date, timedelta
 from pathlib import Path
@@ -6,6 +14,7 @@ import pandas as pd
 from faker import Faker
 from lxml import etree
 
+from reconciliacao.simulation.excel_generator import DEFAULT_REFERENCE_DATE, _WINDOW_DAYS
 from reconciliacao.utils.cnpj import generate_cnpj
 
 _ABRASF_NS = "http://www.abrasf.org.br/nfse.xsd"
@@ -20,10 +29,16 @@ def _sub(parent: etree._Element, tag: str, text: str | None = None) -> etree._El
     return el
 
 
-def generate_nfse(df_pag: pd.DataFrame, conciliation_rate: float, seed: int) -> pd.DataFrame:
+def generate_nfse(
+    df_pag: pd.DataFrame,
+    conciliation_rate: float,
+    seed: int,
+    reference_date: date = DEFAULT_REFERENCE_DATE,
+) -> pd.DataFrame:
     rng = random.Random(seed)
     Faker.seed(seed)
     fake = Faker("pt_BR")
+    window_start = reference_date - timedelta(days=_WINDOW_DAYS)
 
     n = len(df_pag)
     conciliated_indices = set(rng.sample(range(n), k=int(n * conciliation_rate)))
@@ -61,7 +76,7 @@ def generate_nfse(df_pag: pd.DataFrame, conciliation_rate: float, seed: int) -> 
                 valor = round(pag_valor * factor, 2)
             else:  # ghost — completely unrelated invoice
                 cnpj = generate_cnpj(rng)
-                emit_date = fake.date_between(start_date="-1y", end_date="today")
+                emit_date = fake.date_between(start_date=window_start, end_date=reference_date)
                 valor = round(rng.uniform(500.0, 50_000.0), 2)
 
         aliquota = round(rng.uniform(2.0, 5.0), 2)

@@ -2,6 +2,9 @@ simulation:
   n_records: 7500
   conciliation_rate: 0.70
   random_seed: 42
+  # Âncora da janela de 12 meses das datas simuladas. Fixa, e não "hoje":
+  # uma janela relógio-dependente fazia a base mudar a cada dia de execução.
+  reference_date: 2026-06-14
 
 scenarios:
   exact:
@@ -21,7 +24,6 @@ models:
     kernel: rbf
     class_weight: balanced
   logistic_regression:
-    l1_ratio: 0
     class_weight: balanced
   cv_folds: 5
   scoring: f1_macro
@@ -48,6 +50,10 @@ comparison:
   retention_tolerance_pp: 0.05  # tolerância em PONTOS PERCENTUAIS para compat_* e p/ definir hard
   split: { train: 0.60, val: 0.20, test: 0.20 }
   min_precision: 0.90
+  # Margem exigida ACIMA do piso na validação, para compensar o viés de
+  # seleção de escolher o limiar de maior recall entre milhares de candidatos.
+  # 0.0 reproduz os artefatos publicados; ver decision.choose_threshold.
+  precision_margin: 0.0
   cv_folds: 5
   scoring: average_precision_excecao
   leak_guard_max_stump_accuracy: 0.95
