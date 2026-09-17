@@ -23,7 +23,7 @@ def sample_config():
         "models": {
             "random_forest": {"n_estimators": 10, "class_weight": "balanced_subsample"},
             "svm": {"kernel": "rbf", "class_weight": "balanced"},
-            "logistic_regression": {"l1_ratio": 0, "class_weight": "balanced"},
+            "logistic_regression": {"class_weight": "balanced"},
             "cv_folds": 2,
             "scoring": "f1_macro",
             "test_size": 0.20,
@@ -45,7 +45,7 @@ def sample_pagamentos_clean():
         "descricao": ["consultoria TI", "manutencao predial", "limpeza escritorio"],
         "centro_custo": ["CC-001", "CC-002", "CC-003"],
         "cnpj_valid": [True, True, True],
-        "is_duplicate": [False, False, False],
+        "pagamento_duplicado": [False, False, False],
     })
 
 
@@ -72,7 +72,7 @@ def sample_nfse_clean():
         "nfse_discriminacao": ["Servicos de TI", "Manutencao Predial", "Limpeza"],
         "nfse_codigo_municipio": ["3550308", "3550308", "3550308"],
         "nfse_cnpj_valid": [True, True, False],
-        "is_duplicate": [False, False, False],
+        "nfse_duplicada": [False, False, False],
     })
 
 
@@ -96,6 +96,7 @@ def comparison_config():
         "retention_tolerance_pp": 0.05,
         "split": {"train": 0.60, "val": 0.20, "test": 0.20},
         "min_precision": 0.90,
+        "precision_margin": 0.0,
         "cv_folds": 2,
         "scoring": "average_precision_excecao",
         "leak_guard_max_stump_accuracy": 0.95,

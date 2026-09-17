@@ -66,7 +66,7 @@ def test_clean_pagamentos_flags_duplicates():
         "centro_custo": ["CC-1", "CC-1"],
     })
     result = clean_pagamentos(df)
-    assert result["is_duplicate"].all()
+    assert result["pagamento_duplicado"].all()
 
 
 def test_clean_nfse_parses_numeric_fields():

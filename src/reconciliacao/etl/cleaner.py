@@ -1,3 +1,16 @@
+"""Normalise the two raw sources onto comparable types.
+
+Note on the diagnostic columns. `cnpj_valid`, `nfse_cnpj_valid`,
+`pagamento_duplicado` and `nfse_duplicada` are computed here but read by
+nothing downstream: no row is filtered on them and no feature is derived from
+them. They are descriptive output of the cleaning step, not controls over it.
+This is deliberate and has a consequence worth stating -- because the labeler
+joins on the supplier registration number, a payment whose invoice carries a
+corrupted number simply fails to join and becomes "no correspondence", so the
+`cnpj_valid` flag never reaches the classifier and CNPJ errors are resolved
+upstream of the model rather than by it.
+"""
+
 import pandas as pd
 
 from reconciliacao.utils.cnpj import normalize_cnpj, validate_cnpj
@@ -24,7 +37,7 @@ def clean_pagamentos(df: pd.DataFrame) -> pd.DataFrame:
     df["cnpj_valid"] = df["cnpj_fornecedor"].apply(validate_cnpj)
     df["data_pagamento"] = _parse_date(df["data_pagamento"])
     df["valor_pago"] = _parse_float(df["valor_pago"].astype(str))
-    df["is_duplicate"] = df.duplicated("id_pagamento", keep=False)
+    df["pagamento_duplicado"] = df.duplicated("id_pagamento", keep=False)
     return df
 
 
@@ -37,5 +50,5 @@ def clean_nfse(df: pd.DataFrame) -> pd.DataFrame:
     df["nfse_valor_iss"] = pd.to_numeric(df["nfse_valor_iss"], errors="coerce")
     df["nfse_aliquota"] = pd.to_numeric(df["nfse_aliquota"], errors="coerce")
     df["nfse_valor_liquido"] = pd.to_numeric(df["nfse_valor_liquido"], errors="coerce")
-    df["is_duplicate"] = df.duplicated("nfse_numero", keep=False)
+    df["nfse_duplicada"] = df.duplicated("nfse_numero", keep=False)
     return df
