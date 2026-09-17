@@ -28,17 +28,22 @@ coverage.xml
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
-# Data (generated at runtime — not versioned)
-data/
+# Data. Raw and processed datasets are regenerated in seconds by
+# run_pipeline.py, so they are not versioned; the evaluation artifacts under
+# data/results/ ARE versioned, because they are the evidence the write-up
+# cites and a reader must be able to check them without re-training.
+data/raw/
+data/processed/
 
-# Model artifacts
+# Model artifacts (large, and rebuilt by re-running the pipeline)
 *.joblib
 *.pkl
 *.pickle
 
-# IDE
+# IDE and local tool settings
 .vscode/
 .idea/
+.claude/settings.local.json
 *.swp
 *.swo
 
