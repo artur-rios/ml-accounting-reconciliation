@@ -2,6 +2,20 @@
 
 Every feature is computable by someone who does not know whether the pairing is
 genuine. Nothing here participates in defining the label.
+
+Known exact redundancy. ``retencao_implicita_pct`` is ``(1 - razao_valor) *
+100`` -- an affine transform of ``razao_valor``, not an independent piece of
+evidence. The leak-guard report shows it: the two columns record identical
+stump accuracy to sixteen decimal places on every seed. The matrix is
+therefore fourteen columns carrying thirteen directions. Both are kept rather
+than one dropped because every published result was produced with both, and
+removing a column changes the standardised geometry and so every reported
+metric; the redundancy is recorded here, asserted in the test suite, and
+declared in the write-up instead of being silently repaired. It is inert for
+the random forest, which splits on one column at a time, and doubles that
+single direction's weight for the two models that standardise -- a reason to
+expect it to cost the SVM and the logistic regression slightly, never to
+flatter them.
 """
 
 import pandas as pd

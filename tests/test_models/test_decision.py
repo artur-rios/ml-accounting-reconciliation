@@ -43,3 +43,41 @@ def test_metrics_include_pr_auc_and_f1():
     metricas = exception_metrics(y, proba, threshold=0.5)
     assert 0.0 <= metricas["pr_auc_excecao"] <= 1.0
     assert 0.0 <= metricas["f1_macro"] <= 1.0
+
+
+def test_precision_margin_tightens_the_validation_requirement():
+    """The margin exists to buy back the winner's curse: maximising recall
+    over thousands of candidate cut points systematically selects a threshold
+    whose validation precision clears the floor by luck. Requiring a margin
+    must never loosen the choice, and must be a no-op at 0.0 so the published
+    artifacts stay reproducible."""
+    rng = np.random.default_rng(0)
+    y_val = pd.Series(rng.integers(0, 2, size=400))
+    proba = np.where(y_val == 0, rng.uniform(0.35, 1.0, 400), rng.uniform(0.0, 0.65, 400))
+
+    sem_margem = choose_threshold(y_val, proba, min_precision=0.90)
+    explicito_zero = choose_threshold(y_val, proba, min_precision=0.90, precision_margin=0.0)
+    com_margem = choose_threshold(y_val, proba, min_precision=0.90, precision_margin=0.05)
+
+    assert explicito_zero == sem_margem  # default is exactly the published behaviour
+    assert sem_margem is not None
+    # A stricter requirement can only move the cut point up, or find none.
+    assert com_margem is None or com_margem >= sem_margem
+
+
+def test_exception_metrics_reports_the_confusion_cells():
+    """The full matrix, not only the aggregates -- the study's own checklist
+    item 7, counted with the exception (label 0) as the positive class."""
+    y_true = pd.Series([0, 0, 0, 1, 1, 1, 1, 1])
+    proba = np.array([0.9, 0.8, 0.2, 0.7, 0.1, 0.1, 0.1, 0.1])
+
+    metrics = exception_metrics(y_true, proba, threshold=0.5)
+
+    assert metrics["vp_excecao"] == 2   # exceptions correctly referred
+    assert metrics["fn_excecao"] == 1   # divergence silently approved
+    assert metrics["fp_excecao"] == 1   # redundant manual review
+    assert metrics["vn_excecao"] == 4
+    total = sum(metrics[c] for c in ["vp_excecao", "fn_excecao", "fp_excecao", "vn_excecao"])
+    assert total == len(y_true)
+    assert metrics["recall_excecao"] == pytest.approx(2 / 3)
+    assert metrics["precisao_excecao"] == pytest.approx(2 / 3)

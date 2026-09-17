@@ -29,8 +29,14 @@ def test_end_to_end_produces_the_decision_artifacts(tmp_path, sample_config, com
         assert column in summary.columns
 
     for name in ["per_seed_metrics.csv", "wilcoxon.csv", "decision_summary.csv",
-                 "leak_guard_report.csv", "pr_curves.png", "recall_boxplot.png"]:
+                 "leak_guard_report.csv", "pr_curves.png", "recall_boxplot.png",
+                 "friedman.csv", "wilcoxon_secundarias.csv", "confusion_matrices.csv"]:
         assert (tmp_path / name).exists(), name
+
+    # The confusion cells must be reported, not just the aggregates -- this
+    # study's own checklist item 7.
+    for column in comparison_module.CONFUSION_COLUMNS:
+        assert column in summary.columns
 
 
 @pytest.mark.integration
@@ -108,11 +114,11 @@ def test_run_seed_pins_partitions_supplier_terms_and_no_threshold_branch(
     real_choose_threshold = comparison_module.choose_threshold
     call_count = {"n": 0}
 
-    def fake_choose_threshold(y_val, proba, min_precision):
+    def fake_choose_threshold(y_val, proba, min_precision, precision_margin=0.0):
         call_count["n"] += 1
         if call_count["n"] % len(_ALGORITHM_ORDER) == 1:
             return None
-        return real_choose_threshold(y_val, proba, min_precision)
+        return real_choose_threshold(y_val, proba, min_precision, precision_margin)
 
     monkeypatch.setattr(comparison_module, "choose_threshold", fake_choose_threshold)
 
@@ -161,6 +167,8 @@ def test_run_seed_pins_partitions_supplier_terms_and_no_threshold_branch(
         assert math.isnan(row["taxa_encaminhamento"])  # no threshold to compute it at
         assert not math.isnan(row["pr_auc_excecao"])  # threshold-free, still computable (F2)
         assert math.isnan(row["f1_macro"])
+        for coluna in comparison_module.CONFUSION_COLUMNS:
+            assert row[coluna] is None  # no decision taken, so no matrix to count
 
     # paired_comparisons must not raise even though some rows come from the
     # None-threshold branch -- this is the guard the branch exists to satisfy.
@@ -264,3 +272,80 @@ def test_some_test_suppliers_are_also_present_in_train(comparison_config):
     train_suppliers = set(train_df["cnpj_fornecedor"])
     test_suppliers = set(test_df["cnpj_fornecedor"])
     assert len(train_suppliers & test_suppliers) > 0
+
+
+def test_train_and_test_scales_are_comparable(comparison_config):
+    """The assertion whose absence let the desvio_prazo_fornecedor defect
+    through, and the half of the recommendation that was missing.
+
+    test_no_feature_column_is_constant_on_train catches a column with zero
+    training variance. It does not catch the more general failure that
+    produced the artefact: a column whose train and test distributions are on
+    incompatible scales, so that StandardScaler -- fitted on train -- maps
+    test rows to z-scores the model never saw during fitting. The constant
+    column was only the extreme case of that, where the fitted scale was the
+    guard value 1.
+
+    Expressed as the check an engineer would actually run: standardise the
+    test partition with the training partition's own mean and deviation, and
+    require that no column lands an implausible share of test rows in the far
+    tail. Five deviations is deliberately loose -- the defect put 83.75% of
+    rows beyond it, with a maximum of 90.
+    """
+    X_train, X_test, _train_df, _test_df = _built_features(comparison_config)
+
+    media = X_train.mean()
+    desvio = X_train.std(ddof=0)
+    # A genuinely constant training column is the other test's business; here
+    # it must not be allowed to divide to infinity and mask the real check.
+    assert (desvio > 0).all(), f"zero-variance train columns: {list(desvio[desvio == 0].index)}"
+
+    z = (X_test - media) / desvio
+    fracao_extrema = (z.abs() > 5).mean()
+
+    ofensores = fracao_extrema[fracao_extrema > 0.01]
+    assert ofensores.empty, (
+        "test rows fall outside the scale learned on train for: "
+        + ", ".join(f"{nome}={valor:.4f}" for nome, valor in ofensores.items())
+    )
+
+
+def test_razao_valor_and_retencao_are_the_known_exact_redundancy(comparison_config):
+    """Pins the one documented collinearity so it stays documented.
+
+    retencao_implicita_pct is (1 - razao_valor) * 100 by construction. The
+    pair is kept deliberately (see the features_v2 module docstring), so the
+    test asserts the relationship rather than forbidding it -- and would fail
+    if a future change made one of them mean something else while the write-up
+    still described them as redundant.
+    """
+    X_train, _X_test, _train_df, _test_df = _built_features(comparison_config)
+
+    reconstruida = (1.0 - X_train["razao_valor"]) * 100.0
+    assert reconstruida.to_numpy() == pytest.approx(
+        X_train["retencao_implicita_pct"].to_numpy(), abs=1e-9
+    )
+
+    correlacao = X_train["razao_valor"].corr(X_train["retencao_implicita_pct"])
+    assert correlacao == pytest.approx(-1.0, abs=1e-12)
+
+
+def test_no_other_feature_pair_is_perfectly_collinear(comparison_config):
+    """Generalises the above: exactly one perfectly collinear pair is known
+    and declared. A second one appearing would mean the evidence matrix has
+    silently lost another direction, which is the failure this catches."""
+    X_train, _X_test, _train_df, _test_df = _built_features(comparison_config)
+
+    conhecidos = {frozenset({"razao_valor", "retencao_implicita_pct"})}
+    correlacoes = X_train.corr().abs()
+
+    inesperados = []
+    for i, a in enumerate(X_train.columns):
+        for b in X_train.columns[i + 1:]:
+            if frozenset({a, b}) in conhecidos:
+                continue
+            valor = correlacoes.loc[a, b]
+            if pd.notna(valor) and valor > 0.999:
+                inesperados.append((a, b, float(valor)))
+
+    assert inesperados == [], f"undeclared perfect collinearity: {inesperados}"

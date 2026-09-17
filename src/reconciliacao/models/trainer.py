@@ -43,8 +43,12 @@ def get_pipelines(cfg: dict) -> dict[str, tuple]:
         "logistic_regression": (
             Pipeline([
                 ("scaler", StandardScaler()),
+                # No l1_ratio here: scikit-learn only reads it when
+                # penalty="elasticnet", and the default penalty is L2. The
+                # parameter was being passed and silently ignored, so the
+                # config key that fed it has been removed rather than left
+                # to imply a regularisation choice that was never made.
                 ("clf", LogisticRegression(
-                    l1_ratio=mcfg["logistic_regression"]["l1_ratio"],
                     class_weight=mcfg["logistic_regression"]["class_weight"],
                     max_iter=1000,
                     random_state=seed,

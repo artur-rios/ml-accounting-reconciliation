@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from reconciliacao.models.comparison_stats import paired_comparisons
+from reconciliacao.models.comparison_stats import friedman_omnibus, paired_comparisons
 
 
 def _per_seed(values: dict[str, list[float]]) -> pd.DataFrame:
@@ -91,3 +91,50 @@ def test_complete_frame_does_not_raise():
     out = paired_comparisons(df, metric="recall_excecao")
     assert len(out) == 3
     assert not out.isnull().any().any()
+
+
+def test_friedman_omnibus_rejects_when_one_algorithm_always_wins():
+    """The omnibus step: a consistent ordering across seeds must reject the
+    global null before any pairwise table is read."""
+    rows = []
+    for seed in range(10):
+        rows.append({"seed": seed, "algorithm": "a", "m": 0.90 + seed * 0.001})
+        rows.append({"seed": seed, "algorithm": "b", "m": 0.85 + seed * 0.001})
+        rows.append({"seed": seed, "algorithm": "c", "m": 0.80 + seed * 0.001})
+    resultado = friedman_omnibus(pd.DataFrame(rows), metric="m")
+
+    assert resultado["significant"] is True
+    assert resultado["p_value"] < 0.05
+    assert resultado["n_seeds"] == 10
+    assert resultado["n_algorithms"] == 3
+    # Rank 1 = best; a wins every seed, c loses every seed.
+    assert resultado["rank_medio_a"] == pytest.approx(1.0)
+    assert resultado["rank_medio_c"] == pytest.approx(3.0)
+
+
+def test_friedman_omnibus_does_not_reject_without_a_consistent_ordering():
+    """No stable ordering means no licence to read the pairwise table."""
+    valores = {
+        "a": [0.80, 0.90, 0.85, 0.83, 0.88, 0.81, 0.89, 0.84, 0.86, 0.82],
+        "b": [0.90, 0.80, 0.83, 0.88, 0.81, 0.89, 0.84, 0.86, 0.82, 0.85],
+        "c": [0.85, 0.83, 0.90, 0.81, 0.89, 0.84, 0.86, 0.82, 0.88, 0.80],
+    }
+    rows = [
+        {"seed": seed, "algorithm": nome, "m": serie[seed]}
+        for nome, serie in valores.items()
+        for seed in range(10)
+    ]
+    resultado = friedman_omnibus(pd.DataFrame(rows), metric="m")
+    assert resultado["significant"] is False
+
+
+def test_friedman_omnibus_rejects_incomplete_pairings():
+    """Same completeness contract as the pairwise test: a missing cell would
+    silently unbalance a paired test rather than fail it."""
+    rows = [
+        {"seed": 0, "algorithm": "a", "m": 0.9},
+        {"seed": 0, "algorithm": "b", "m": 0.8},
+        {"seed": 1, "algorithm": "a", "m": 0.9},
+    ]
+    with pytest.raises(ValueError, match="Missing"):
+        friedman_omnibus(pd.DataFrame(rows), metric="m")

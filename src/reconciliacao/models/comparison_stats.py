@@ -1,15 +1,23 @@
 """Paired comparison of algorithms across seeds.
 
-Wilcoxon signed-rank on the paired per-seed metric, with Holm correction for the
-three pairwise comparisons. The median paired difference is reported alongside
-the p-value: with ten seeds the test has little power for small differences, so
-significance without magnitude would not support a recommendation.
+The protocol follows Demsar (2006), who is cited for it: a Friedman omnibus
+test first, establishing that the algorithms are not all equivalent, and only
+then the pairwise post-hoc tests. Reporting pairwise Wilcoxon alone -- which
+this module did originally -- inverts the order Demsar recommends and invites
+the objection that three dependent pairwise tests were run without first
+rejecting the global null.
+
+The post-hoc step is Wilcoxon signed-rank on the paired per-seed metric, with
+Holm correction for the three pairwise comparisons. The median paired
+difference is reported alongside the p-value: with ten seeds the test has
+little power for small differences, so significance without magnitude would
+not support a recommendation.
 """
 
 from itertools import combinations
 
 import pandas as pd
-from scipy.stats import wilcoxon
+from scipy.stats import friedmanchisquare, wilcoxon
 
 ALPHA = 0.05
 
@@ -27,10 +35,14 @@ def _holm(p_values: list[float]) -> list[float]:
     return adjusted
 
 
-def paired_comparisons(per_seed: pd.DataFrame, metric: str) -> pd.DataFrame:
-    """Pairwise Wilcoxon over seeds, Holm-corrected, with effect size."""
+def _complete_wide(per_seed: pd.DataFrame, metric: str) -> pd.DataFrame:
+    """Seeds x algorithms matrix for one metric, rejecting any missing cell.
+
+    Both the omnibus and the post-hoc tests are paired: a missing
+    (seed, algorithm) cell would silently unbalance them, so it is an error
+    rather than something to drop.
+    """
     wide = per_seed.pivot(index="seed", columns="algorithm", values=metric)
-    algorithms = sorted(wide.columns)
 
     # Validate that no (seed, algorithm) combinations are missing
     missing_mask = wide.isna()
@@ -53,6 +65,48 @@ def paired_comparisons(per_seed: pd.DataFrame, metric: str) -> pd.DataFrame:
             msg_lines.append(f"  ... and {len(missing_cells) - max_show} more (total: {len(missing_cells)})")
 
         raise ValueError("\n".join(msg_lines))
+
+    return wide
+
+
+def friedman_omnibus(per_seed: pd.DataFrame, metric: str) -> dict[str, float]:
+    """Friedman test over the seeds x algorithms matrix.
+
+    The omnibus step Demsar (2006) puts before any post-hoc comparison: it
+    asks whether the algorithms rank differently across seeds at all, without
+    committing to which pair differs. Rejecting here is what licenses reading
+    the pairwise table that follows.
+
+    Returns the statistic, the p-value, and the mean rank of each algorithm
+    (rank 1 = best on that seed), since the ranks are what the test actually
+    operates on and they make the direction of the result readable.
+    """
+    wide = _complete_wide(per_seed, metric)
+    algorithms = sorted(wide.columns)
+
+    statistic, p_value = friedmanchisquare(*[wide[a] for a in algorithms])
+
+    # Rank 1 = highest metric value on that seed; every metric fed here is
+    # one where larger is better.
+    ranks = wide[algorithms].rank(axis=1, ascending=False).mean()
+
+    resultado = {
+        "metric": metric,
+        "n_seeds": int(len(wide)),
+        "n_algorithms": len(algorithms),
+        "statistic": float(statistic),
+        "p_value": float(p_value),
+        "significant": bool(p_value < ALPHA),
+    }
+    for algorithm in algorithms:
+        resultado[f"rank_medio_{algorithm}"] = float(ranks[algorithm])
+    return resultado
+
+
+def paired_comparisons(per_seed: pd.DataFrame, metric: str) -> pd.DataFrame:
+    """Pairwise Wilcoxon over seeds, Holm-corrected, with effect size."""
+    wide = _complete_wide(per_seed, metric)
+    algorithms = sorted(wide.columns)
 
     rows, raw_p_values = [], []
     for a, b in combinations(algorithms, 2):

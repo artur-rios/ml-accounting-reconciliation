@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt  # noqa: E402  (backend must be set first)
 from sklearn.metrics import PrecisionRecallDisplay, average_precision_score  # noqa: E402
 
 from reconciliacao.etl.truth_labeler import label_from_truth
-from reconciliacao.models.comparison_stats import paired_comparisons
+from reconciliacao.models.comparison_stats import friedman_omnibus, paired_comparisons
 from reconciliacao.models.comparison_trainer import fit_algorithms
 from reconciliacao.models.decision import choose_threshold, exception_metrics
 from reconciliacao.models.features_v2 import build_features_v2, fit_supplier_terms
@@ -25,6 +25,16 @@ from reconciliacao.models.leak_guard import assert_no_leak
 from reconciliacao.simulation.truth_generator import generate_comparison_dataset
 
 PRIMARY_METRIC = "recall_excecao"
+
+# The primary metric is measured at each algorithm's own operating point, and
+# those points do not land on identical realised precisions -- so a reader can
+# object that the recall ranking is partly a precision trade. These two answer
+# that objection from the same runs: pr_auc_excecao ranks the algorithms
+# without reference to any threshold, and precisao_excecao shows whether the
+# realised precisions differ at all.
+SECONDARY_METRICS = ["pr_auc_excecao", "precisao_excecao"]
+
+CONFUSION_COLUMNS = ["vp_excecao", "fp_excecao", "fn_excecao", "vn_excecao"]
 
 
 def _split_three_ways(df: pd.DataFrame, cmp_cfg: dict, seed: int):
@@ -80,7 +90,12 @@ def run_seed(cfg: dict, seed: int) -> tuple[list[dict], pd.Series, dict[str, tup
         proba_test = model.predict_proba(X_te)[:, col_excecao]
         curves[name] = ((y_te.to_numpy() == 0).astype(int), proba_test)
 
-        threshold = choose_threshold(y_val, proba_val, cmp_cfg["min_precision"])
+        threshold = choose_threshold(
+            y_val,
+            proba_val,
+            cmp_cfg["min_precision"],
+            precision_margin=cmp_cfg.get("precision_margin", 0.0),
+        )
         if threshold is None:
             # pr_auc_excecao is threshold-free (a ranking metric over the full
             # score, not a decision at a cut point), so it is still computable
@@ -98,6 +113,9 @@ def run_seed(cfg: dict, seed: int) -> tuple[list[dict], pd.Series, dict[str, tup
                 "precisao_validacao": None, "recall_excecao": 0.0,
                 "precisao_excecao": float("nan"), "taxa_encaminhamento": float("nan"),
                 "pr_auc_excecao": pr_auc, "f1_macro": float("nan"),
+                # No threshold means no decision was taken, so there is no
+                # confusion matrix to count -- not an all-zero one.
+                **{coluna: None for coluna in CONFUSION_COLUMNS},
             })
             continue
 
@@ -139,6 +157,22 @@ def _plot_recall_boxplot(per_seed: pd.DataFrame, destination: Path) -> None:
     plt.close(fig)
 
 
+def _confusion_table(per_seed: pd.DataFrame) -> pd.DataFrame:
+    """Exception-class confusion cells per algorithm, summed over the seeds.
+
+    Reported because this study recommends it: the aggregate metrics of the
+    main experiment hid a 130/0 false-positive asymmetry that only the matrix
+    made visible, and an experiment that argues for the practice should follow
+    it. Summing over seeds rather than averaging keeps the cells integers and
+    makes the referral cost readable as a count of payments.
+    """
+    presentes = [c for c in CONFUSION_COLUMNS if c in per_seed.columns]
+    tabela = per_seed.groupby("algorithm")[presentes].sum(min_count=1)
+    tabela["divergencias_silenciadas"] = tabela["fn_excecao"]
+    tabela["revisoes_redundantes"] = tabela["fp_excecao"]
+    return tabela.sort_values("vp_excecao", ascending=False)
+
+
 def run(cfg: dict, n_seeds: int, output_dir: Path) -> pd.DataFrame:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -156,8 +190,26 @@ def run(cfg: dict, n_seeds: int, output_dir: Path) -> pd.DataFrame:
     per_seed.to_csv(output_dir / "per_seed_metrics.csv", index=False)
     pd.concat(leak_reports, axis=1).to_csv(output_dir / "leak_guard_report.csv")
 
+    # Omnibus first, post-hoc second -- the order Demsar (2006) prescribes.
+    friedman = pd.DataFrame(
+        [friedman_omnibus(per_seed, metric=m) for m in [PRIMARY_METRIC, *SECONDARY_METRICS]]
+    )
+    friedman.to_csv(output_dir / "friedman.csv", index=False)
+
     wilcoxon = paired_comparisons(per_seed, metric=PRIMARY_METRIC)
     wilcoxon.to_csv(output_dir / "wilcoxon.csv", index=False)
+
+    # The same post-hoc test on the threshold-free ranking metric and on the
+    # realised precision. Together they separate "ranks higher" from "operates
+    # at a laxer precision", which the primary metric alone cannot.
+    secondary = pd.concat(
+        [paired_comparisons(per_seed, metric=m).assign(metric=m) for m in SECONDARY_METRICS],
+        ignore_index=True,
+    )
+    secondary.to_csv(output_dir / "wilcoxon_secundarias.csv", index=False)
+
+    confusion = _confusion_table(per_seed)
+    confusion.to_csv(output_dir / "confusion_matrices.csv")
 
     summary = (
         per_seed.groupby("algorithm")
@@ -179,7 +231,13 @@ def run(cfg: dict, n_seeds: int, output_dir: Path) -> pd.DataFrame:
     print("\n=== Exception recall under precision >= "
           f"{cfg['comparison']['min_precision']} ===")
     print(summary.to_string())
-    print("\n=== Paired Wilcoxon (Holm) ===")
+    print("\n=== Friedman omnibus ===")
+    print(friedman.to_string(index=False))
+    print(f"\n=== Paired Wilcoxon (Holm) on {PRIMARY_METRIC} ===")
     print(wilcoxon.to_string(index=False))
+    print("\n=== Paired Wilcoxon (Holm) on the secondary metrics ===")
+    print(secondary.to_string(index=False))
+    print("\n=== Exception-class confusion matrix, summed over seeds ===")
+    print(confusion.to_string())
 
     return per_seed
