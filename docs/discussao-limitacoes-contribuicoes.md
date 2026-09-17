@@ -20,19 +20,21 @@ Todos os números citados foram extraídos diretamente dos artefatos do reposit�
 | Cenário | Algoritmo | Acurácia | F1-macro | Precisão-macro | Recall-macro | CV média ± dp | ROC-AUC |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | exact | Random Forest | 1,0000 | 1,0000 | 1,0000 | 1,0000 | 1,0000 ± 0,0000 | 1,0000 |
-| exact | SVM (RBF) | 0,9136 | 0,8873 | 0,9449 | 0,8568 | 0,9080 ± 0,0092 | 0,9866 |
-| exact | Regressão Logística | 0,9136 | 0,8873 | 0,9449 | 0,8568 | 0,9086 ± 0,0089 | 0,9713 |
-| fuzzy | Random Forest | 1,0000 | 1,0000 | 1,0000 | 1,0000 | 0,9996 ± 0,0007 | — |
-| fuzzy | SVM (RBF) | 0,9209 | 0,8645 | 0,9567 | 0,8280 | 0,8636 ± 0,0101 | — |
-| fuzzy | Regressão Logística | 0,9235 | 0,8684 | 0,9659 | 0,8304 | 0,8701 ± 0,0087 | — |
+| exact | SVM (RBF) | 0,9149 | 0,8892 | 0,9457 | 0,8590 | 0,9061 ± 0,0072 | 0,9824 |
+| exact | Regressão Logística | 0,9149 | 0,8892 | 0,9457 | 0,8590 | 0,9081 ± 0,0089 | 0,9877 |
+| fuzzy | Random Forest | 1,0000 | 1,0000 | 1,0000 | 1,0000 | 0,9978 ± 0,0021 | — |
+| fuzzy | SVM (RBF) | 0,9182 | 0,8672 | 0,9264 | 0,8371 | 0,8611 ± 0,0137 | — |
+| fuzzy | Regressão Logística | 0,9282 | 0,8791 | 0,9664 | 0,8407 | 0,8678 ± 0,0151 | — |
 
 ### 1.2 Composição das bases
 
-- **Registros processados:** 7.518 pagamentos (de 7.500 solicitados; a diferença decorre de duplicidades
-  de CNPJ resolvidas no *merge*). Conjunto de teste: 1.504 registros (20%, estratificado).
+- **Registros processados:** 7.518 pagamentos a partir de 7.500 solicitados. A diferença **não** é uma
+  duplicidade resolvida no *merge*: são 18 pagamentos que a junção por CNPJ multiplica em duas linhas,
+  12 deles com rótulos contraditórios entre si — ver §2.7. Conjunto de teste: 1.504 registros (20%,
+  estratificado).
 - **Cenário `exact`:** 5.250 conciliados (69,83%) e 2.268 não conciliados (30,17%).
-- **Cenário `fuzzy`:** 5.250 conciliados (69,83%), 1.129 parcialmente conciliados (15,02%) e
-  1.139 não conciliados (15,15%).
+- **Cenário `fuzzy`:** 5.250 conciliados (69,83%), 1.130 parcialmente conciliados (15,03%) e
+  1.138 não conciliados (15,14%).
 - **Composição da classe negativa (`exact`):** 1.119 registros sem correspondência na NFS-e (49,3% —
   erros de CNPJ e notas *ghost*), 582 divergências de data (25,7%) e 567 divergências de valor (25,0%).
 
@@ -42,21 +44,21 @@ Todos os números citados foram extraídos diretamente dos artefatos do reposit�
 
 |  | Predito 0 | Predito 1 |
 | --- | --- | --- |
-| **Real 0** | 324 | 130 |
+| **Real 0** | 326 | 128 |
 | **Real 1** | 0 | 1.050 |
 
-Recall da classe negativa: 71,37%. Recall da classe positiva: 100,00%. **Zero falsos negativos, 130 falsos positivos.**
+Recall da classe negativa: 71,81%. Recall da classe positiva: 100,00%. **Zero falsos negativos, 128 falsos positivos.**
 
 **Regressão Logística, cenário `fuzzy`:**
 
 |  | Predito 0 | Predito 1 | Predito 2 |
 | --- | --- | --- | --- |
-| **Real 0** | 228 | 0 | 0 |
-| **Real 1** | 1 | 111 | 114 |
+| **Real 0** | 227 | 1 | 0 |
+| **Real 1** | 0 | 119 | 107 |
 | **Real 2** | 0 | 0 | 1.050 |
 
-**114 dos 226 registros parcialmente conciliados (50,44%) foram promovidos à classe "conciliado".**
-As classes extremas foram classificadas sem erro.
+**107 dos 226 registros parcialmente conciliados (47,35%) foram promovidos à classe "conciliado".**
+A classe plenamente conciliada foi classificada sem erro.
 
 ---
 
@@ -84,7 +86,7 @@ exemplos" — tarefa para a qual o particionamento recursivo de árvores é a hi
 adequada.
 
 A evidência empírica é inequívoca: no gráfico de importância de variáveis do cenário `exact`,
-`delta_valor_pct` (≈0,46) e `delta_days` (≈0,42) concentram aproximadamente **87% da importância total**.
+`delta_valor_pct` (≈0,44) e `delta_days` (≈0,43) concentram aproximadamente **87% da importância total**.
 As demais cinco variáveis somam ≈13%, e `cnpj_match` tem importância exatamente zero.
 
 Este é o fenômeno que Kaufman, Rosset, Perlich e Stitelman descreveram como *leakage* — a introdução, no
@@ -96,8 +98,8 @@ vazamento é justamente o desempenho implausivelmente alto e estável — precis
 aqui (acurácia unitária com dp de validação cruzada nulo).
 
 O experimento de ablação apresentado na **seção 3** confirma esse diagnóstico de forma quantitativa: ao
-remover as duas variáveis da regra, o F1-macro da Random Forest cai de 1,0000 para 0,7568 no cenário
-`exact` e para 0,6538 no cenário `fuzzy`.
+remover as duas variáveis da regra, o F1-macro da Random Forest cai de 1,0000 para 0,7630 no cenário
+`exact` e para 0,6526 no cenário `fuzzy`.
 
 **Como redigir isso na monografia.** Não apresente o 1,0000 como sucesso. Apresente-o como *achado
 metodológico*: o experimento demonstra que, quando a definição operacional de conciliação é convertida
@@ -117,7 +119,7 @@ trabalho oferece uma instância concreta, reprodutível e quantificada desse des
 
 ### 2.2 Por que SVM e Regressão Logística estacionam em ~0,91: uma explicação geométrica
 
-O contraste entre a Random Forest (1,0000) e os modelos de fronteira suave (0,9136) **não decorre de
+O contraste entre a Random Forest (1,0000) e os modelos de fronteira suave (0,9149) **não decorre de
 superioridade conceitual das florestas aleatórias para o domínio de conciliação**. Decorre de uma
 interação entre a codificação de ausência de correspondência e a padronização de escala.
 
@@ -127,7 +129,7 @@ das variáveis — apenas a ordem importa para a escolha de pontos de corte. Já
 operam sobre variáveis padronizadas por `StandardScaler` (`src/reconciliacao/models/trainer.py:39,55`), e
 a sentinela distorce severamente média e desvio-padrão.
 
-Calculando sobre a base `exact`, `delta_days` apresenta média 1.490,08 e desvio-padrão 3.558,24. Após a
+Calculando sobre a base `exact`, `delta_days` apresenta média 1.490,05 e desvio-padrão 3.558,25. Após a
 padronização:
 
 | `delta_days` original | Valor padronizado (z) |
@@ -139,24 +141,29 @@ padronização:
 | 9999 (sentinela) | +2,3913 |
 
 **Toda a faixa informativa de `delta_days` — de 0 a 30 dias, que é onde reside a decisão de conciliação —
-comprime-se em um intervalo de 0,0085 desvios-padrão**, enquanto a sentinela ocupa sozinha 2,8 desvios.
+comprime-se em um intervalo de 0,0084 desvios-padrão**, enquanto a sentinela ocupa sozinha 2,8 desvios.
 Para um classificador de margem, a diferença entre um pagamento na data exata e um pagamento com 30 dias
 de defasagem torna-se numericamente indistinguível de ruído.
 
-A variável `delta_valor_pct` sofre distorção muito menor (0% → −0,4480; 6% → −0,2800; diferença de 0,168
+A variável `delta_valor_pct` sofre distorção muito menor (0% → −0,4464; 6% → −0,2792; diferença de 0,167
 desvios), o que explica precisamente o padrão de erros observado: **os modelos suaves continuam separando
-divergências de valor, mas perdem quase completamente a capacidade de separar divergências de data.** Os
-130 falsos positivos do cenário `exact` são compatíveis, em ordem de grandeza, com os ~116 registros de
-divergência de data presentes no conjunto de teste. No cenário `fuzzy`, os 114 registros parciais
-promovidos indevidamente à classe "conciliado" seguem a mesma lógica.
+divergências de valor, mas perdem quase completamente a capacidade de separar divergências de data.**
+
+A decomposição dos erros confirma isso de forma exata, e não apenas em ordem de grandeza. O conjunto de
+teste do cenário `exact` contém 454 negativos: 208 sem nota alguma, 115 com divergência de valor e 131
+com divergência de data. Dos 128 falsos positivos cometidos pelo SVM e pela Regressão Logística,
+**128 são divergências de data — todos eles**. Os dois modelos detectam 208 de 208 ausências de nota e
+115 de 115 divergências de valor, e deixam passar 128 das 131 divergências de data. A dimensão que a
+sentinela esmagou é exatamente, e somente, a que os modelos perderam. No cenário `fuzzy`, os 107
+registros parciais promovidos indevidamente à classe "conciliado" seguem a mesma lógica.
 
 Note-se ainda que **SVM e Regressão Logística produziram matrizes de confusão rigorosamente idênticas no
-cenário `exact`** — mesmos 324/130/0/1.050. Dois modelos de famílias distintas convergindo para a mesma
+cenário `exact`** — mesmos 326/128/0/1.050. Dois modelos de famílias distintas convergindo para a mesma
 partição do espaço de teste é indício adicional de que ambos colapsaram para essencialmente a mesma
 decisão univariada sobre `delta_valor_pct`.
 
 **Esta hipótese foi testada diretamente e confirmada** (seção 3.3): substituindo a sentinela por
-indicador explícito de correspondência, SVM e Regressão Logística saltam de 0,8873 para **1,0000** de
+indicador explícito de correspondência, SVM e Regressão Logística saltam de 0,8892 para **1,0000** de
 F1-macro no cenário `exact`, eliminando integralmente a diferença em relação à Random Forest. A conclusão
 apropriada, portanto, não é "use Random Forest para conciliação", e sim: **a diferença de desempenho
 entre os três algoritmos era, em sua totalidade, um artefato de pré-processamento.**
@@ -171,7 +178,7 @@ que o desempenho relativo de algoritmos é condicionado à representação dos d
 ### 2.3 A assimetria dos erros e o custo em contexto de auditoria
 
 O achado de maior relevância prática está na **estrutura** dos erros, não em sua quantidade. No cenário
-`exact`, SVM e Regressão Logística cometeram **130 falsos positivos e nenhum falso negativo**.
+`exact`, SVM e Regressão Logística cometeram **128 falsos positivos e nenhum falso negativo**.
 
 Em conciliação financeira, essas duas categorias têm consequências assimétricas:
 
@@ -187,7 +194,7 @@ controle interno**. No cenário `fuzzy`, o efeito é ainda mais pronunciado: met
 parcialmente conciliados recebe atestado de conformidade plena.
 
 A ablação mostra que esse viés **se agrava** quando o vazamento é removido: sem as variáveis da regra, a
-Random Forest passa a cometer 250 falsos positivos contra zero falsos negativos no cenário `exact`
+Random Forest passa a cometer 245 falsos positivos contra zero falsos negativos no cenário `exact`
 (seção 3.4). A tendência a silenciar exceções não é acidental — decorre da combinação entre desbalanço de
 classes (69,8% positivos) e métrica de seleção simétrica.
 
@@ -203,12 +210,12 @@ exceção, sob restrição de precisão mínima aceitável — não F1-macro nem
 encaminha 15% dos registros para revisão manual mas não deixa passar nenhuma divergência é
 operacionalmente superior a um que automatiza 91% silenciando 29% das exceções.
 
-Observe-se também a discrepância entre ROC-AUC e F1-macro: o SVM no cenário `exact` atinge AUC de 0,9866
-com F1-macro de apenas 0,8873. Com classes desbalanceadas, a curva ROC produz impressão otimista do
+Observe-se também a discrepância entre ROC-AUC e F1-macro: o SVM no cenário `exact` atinge AUC de 0,9824
+com F1-macro de apenas 0,8892, e a Regressão Logística 0,9877 com o mesmo 0,8892. Com classes desbalanceadas, a curva ROC produz impressão otimista do
 desempenho, fenômeno documentado por `[VERIFICAR: Saito, T.; Rehmsmeier, M. "The Precision-Recall Plot
 Is More Informative than the ROC Plot When Evaluating Binary Classifiers on Imbalanced Datasets". PLoS
 ONE, v. 10, n. 3, 2015]`. A ablação fornece ilustração ainda mais didática: no cenário `fuzzy` sem
-vazamento, o SVM alcança **acurácia de 0,8497 sem jamais predizer a classe "parcialmente conciliado"**
+vazamento, o SVM alcança **acurácia de 0,8491 sem jamais predizer a classe "parcialmente conciliado"**
 (recall da classe 1 = 0,0000). Vale registrar essa observação como limitação metodológica do próprio
 conjunto de métricas adotado.
 
@@ -231,7 +238,7 @@ foi subdividir a classe negativa em duas, aplicando a regra de proximidade (4× 
 5× a tolerância de valor). A conclusão legítima é, portanto, mais restrita e mais interessante:
 
 > O aumento da granularidade do rótulo — de binário para ternário — degradou o desempenho dos modelos de
-> fronteira suave (F1-macro de 0,8873 para 0,8645 no SVM) sem afetar a Random Forest, porque a classe
+> fronteira suave (F1-macro de 0,8892 para 0,8672 no SVM) sem afetar a Random Forest, porque a classe
 > intermediária é definida por limiares sobre as mesmas variáveis vazadas. A dificuldade adicional recai
 > integralmente sobre a fronteira entre "parcial" e "conciliado", que é justamente a região comprimida
 > pela padronização.
@@ -289,6 +296,124 @@ que um pagamento quite várias notas, que uma nota seja quitada em parcelas, ou 
 fornecedores com dados cadastrais semelhantes. Reconhecer isso explicitamente fortalece a monografia, e
 converte a limitação em agenda de pesquisa bem delimitada (seção 8).
 
+### 2.7 Quarto achado: as duas fontes compartilhavam o mesmo fluxo pseudoaleatório
+
+O desenho apresenta as duas fontes como heterogêneas **e independentes** — é essa independência que
+sustenta a analogia com a conciliação real, em que a planilha de pagamentos e o arquivo de notas vêm de
+sistemas distintos. A independência de *formato* existe. A independência **estatística** não existia.
+
+`generate_payment_records(n, seed)` e `generate_nfse(df_pag, taxa, seed)` recebiam a **mesma** semente e
+cada uma instanciava seu próprio `random.Random(seed)`. Duas instâncias de `random.Random` construídas com
+a mesma semente produzem a mesma sequência; ambas as funções sorteiam CNPJs dessa sequência. A verificação
+é direta e não deixa margem:
+
+```python
+rng = random.Random(42)
+seen = set()
+while len(seen) < 7500:
+    seen.add(generate_cnpj(rng))       # o pool de fornecedores
+
+rng2 = random.Random(42)               # um segundo fluxo, mesma semente
+sum(generate_cnpj(rng2) in seen for _ in range(7500))   # -> 7500
+```
+
+Os 7.500 primeiros CNPJs de um fluxo independente com a mesma semente são, um a um, os mesmos 7.500 CNPJs
+do pool de fornecedores. As consequências, medidas sobre a base publicada:
+
+| Efeito | Contagem | Esperado por acaso |
+| --- | --- | --- |
+| Notas cujo CNPJ do **tomador** coincide com o de algum fornecedor | 277 | ~0,00005 |
+| Notas cujo CNPJ do **prestador** colide com o de outro pagamento | 18 | ~0,00005 |
+| Razão social do prestador idêntica à do tomador | 14 | — |
+
+Com 7.500 CNPJs sorteados de um espaço de 10¹², a probabilidade de uma única colisão fortuita é da ordem
+de 10⁻⁵. Observar 277 não é coincidência: é reutilização de fluxo.
+
+**O que isso produz na base.** As 18 colisões de prestador são as que chegam ao modelo. A junção do
+rotulador é feita pelo CNPJ do fornecedor, de modo que um pagamento cujo CNPJ aparece em duas notas gera
+**duas linhas** — é essa a origem dos 7.518 registros a partir de 7.500 pagamentos. E como o rótulo é um
+limiar sobre as diferenças *de cada linha*, as duas linhas do mesmo pagamento podem discordar: em **12
+dos 18 casos** o mesmo pagamento aparece simultaneamente como conciliado e como não conciliado. Sob a
+divisão estratificada com semente 42, alguns desses pagamentos caem nas duas partições ao mesmo tempo,
+acrescentando uma contaminação de identidade entre treino e teste à contaminação de rótulo já
+documentada em §2.1.
+
+**Por que a redação anterior estava errada.** O texto descrevia a diferença como "inscrições duplicadas
+**resolvidas** no cruzamento". Nada é resolvido: a junção **multiplica** as linhas e produz rótulos
+contraditórios para o mesmo pagamento. A formulação correta é a deste parágrafo.
+
+**O que não é afetado.** O experimento de comparação (§4) usa um gerador distinto,
+`simulation/truth_generator.py`, que instancia um único `random.Random` e um único `Faker` para as duas
+fontes. Não há reutilização de fluxo ali, não há colisão de CNPJ, e cada pagamento tem exatamente uma nota
+candidata. **A conclusão da primeira pergunta de pesquisa não depende deste defeito.**
+
+**Por que isto pertence à monografia.** O defeito tem a assinatura dos outros: nenhuma exceção, nenhuma
+métrica anômala, uma discrepância de contagem de 18 linhas em 7.500 que foi registrada e explicada com
+uma frase plausível e errada. Um leitor que abrisse o XML encontraria notas em que a empresa compradora é
+também o fornecedor — mas nenhuma verificação automatizada olhava para isso, porque nenhuma tinha sido
+escrita para esse modo de falha.
+
+---
+
+### 2.8 Quinto achado: o pipeline principal não era determinístico
+
+A reprodutibilidade era apresentada como requisito de projeto e como contribuição prática (§7.1). A
+afirmação do `README.md` — "todos os resultados são determinísticos dada a mesma configuração e a mesma
+semente" — era **falsa** para o experimento principal, por duas causas independentes, ambas no gerador.
+
+**Primeira causa: a ordem de um conjunto.** Os CNPJs eram acumulados em um `set` e depois convertidos em
+lista:
+
+```python
+cnpjs: set[str] = set()
+while len(cnpjs) < n:
+    cnpjs.add(generate_cnpj(rng))
+cnpj_list = list(cnpjs)          # <- ordem dependente do hash de strings
+```
+
+A ordem de iteração de um `set` de *strings* depende do *hash seed* do processo, que o CPython
+aleatoriza a cada inicialização do interpretador salvo se `PYTHONHASHSEED` for fixado. Cada execução
+atribuía, portanto, um CNPJ **diferente** a cada pagamento, sorteando valores, datas e descrições
+idênticos. A demonstração cabe em duas linhas:
+
+```
+PYTHONHASHSEED=0      -> primeiro CNPJ 43303654145847
+PYTHONHASHSEED=12345  -> primeiro CNPJ 60883561595110
+```
+
+**Por que o teste existente não pegou.** Havia um teste chamado
+`test_generate_payment_records_reproducible`, que chamava o gerador duas vezes e comparava os resultados.
+Ele passava — e teria passado sob qualquer ordem —, porque as duas chamadas ocorrem **no mesmo processo**,
+onde o *hash seed* é fixo durante todo o tempo de vida do interpretador. O teste media consistência
+interna, não reprodutibilidade. A verificação que enxerga o defeito precisa de dois processos com
+`PYTHONHASHSEED` distintos, e passou a existir na suíte.
+
+**Segunda causa: a janela de datas seguia o relógio.** As datas vinham de
+`fake.date_between(start_date="-1y", end_date="today")`. Faker resolve `"today"` contra a data corrente,
+de modo que a janela de doze meses deslizava a cada dia e a base simulada dependia de *quando* foi
+gerada. A janela passou a ser ancorada em `simulation.reference_date`, no arquivo de configuração.
+
+**O efeito combinado, medido.** Regenerar a base sob a implementação antiga, em outro dia e outro
+processo, produzia 7.520 linhas em vez de 7.518, com 20 multiplicações de junção em vez de 18. Tudo o
+mais — a distribuição de `delta_days`, os 5.250 registros conciliados, os valores e as descrições —
+permanecia idêntico. É um efeito pequeno, e essa é justamente a razão pela qual passou despercebido: a
+não-reprodutibilidade se manifestava apenas na terceira casa decimal de algumas métricas e em duas linhas
+de contagem.
+
+**Um terceiro detalhe, correlato.** No gerador do experimento de comparação a janela era
+`date_between(start_date="-1y", end_date="-2m")`, escrita para deixar dois meses entre a emissão da nota e
+o fim da janela — tempo para que a nota fosse paga. Faker lê `"-2m"` como **dois minutos**: na sua
+gramática de datas relativas, `m` minúsculo são minutos e meses são `M` maiúsculo. O intervalo de dois
+meses nunca existiu, e a janela terminava na data corrente. Como nenhum atributo lê data absoluta, isso
+não move métrica alguma; corrigi-lo para dois meses de fato moveria, porque altera a largura da janela e
+portanto o sorteio. A largura efetiva foi preservada e a discrepância fica registrada aqui, em vez de
+silenciosamente corrigida.
+
+**O estado atual.** Os três experimentos são determinísticos dada a configuração: a lista de CNPJs é
+construída na ordem de sorteio, a janela de datas é ancorada em data fixa, e a suíte contém a asserção de
+reprodutibilidade entre processos. Verificou-se, além disso, que a ancoragem de datas **não move nenhuma
+métrica** do experimento de comparação — as dez sementes reproduzem os artefatos publicados bit a bit.
+
 ---
 
 ## 3. Experimento complementar de ablação
@@ -320,19 +445,19 @@ binária, e não por um valor extremo na escala contínua.
 
 | Configuração | Random Forest | SVM (RBF) | Regressão Logística |
 | --- | --- | --- | --- |
-| `full` (linha de base) | **1,0000** | 0,8873 | 0,8873 |
+| `full` (linha de base) | **1,0000** | 0,8892 | 0,8892 |
 | `sentinel_fixed` | **1,0000** | **1,0000** | **1,0000** |
-| `no_leak` | 0,7568 | **0,7808** | 0,6799 |
-| `no_leak_strict` | **0,4966** | 0,4111 | 0,4709 |
+| `no_leak` | 0,7630 | **0,7837** | 0,6815 |
+| `no_leak_strict` | **0,4976** | 0,4111 | 0,4608 |
 
 **Cenário `fuzzy`:**
 
 | Configuração | Random Forest | SVM (RBF) | Regressão Logística |
 | --- | --- | --- | --- |
-| `full` (linha de base) | **1,0000** | 0,8645 | 0,8684 |
-| `sentinel_fixed` | **1,0000** | 0,9985 | **1,0000** |
-| `no_leak` | **0,6538** | 0,6337 | 0,6336 |
-| `no_leak_strict` | **0,3517** | 0,2741 | 0,2526 |
+| `full` (linha de base) | **1,0000** | 0,8672 | 0,8791 |
+| `sentinel_fixed` | **1,0000** | **1,0000** | **1,0000** |
+| `no_leak` | 0,6526 | 0,6334 | **0,6540** |
+| `no_leak_strict` | **0,3313** | 0,2741 | 0,2618 |
 
 A configuração `full` reproduziu os valores do experimento principal com precisão de quatro casas
 decimais, apesar de executada sob versões mais recentes das bibliotecas (scikit-learn 1.9.0, pandas
@@ -343,9 +468,9 @@ decimais, apesar de executada sob versões mais recentes das bibliotecas (scikit
 Na configuração `sentinel_fixed`, **os três algoritmos atingem matrizes de confusão idênticas e perfeitas**
 no cenário `exact`: 454 verdadeiros negativos, 1.050 verdadeiros positivos, **zero falsos positivos e zero
 falsos negativos**. A validação cruzada da Regressão Logística registra 1,0000 ± 0,0000 e a do SVM
-0,9998 ± 0,0004.
+0,9990 ± 0,0011.
 
-A diferença de 9,0 pontos percentuais de F1-macro entre a Random Forest e os modelos de fronteira suave —
+A diferença de 11,1 pontos percentuais de F1-macro entre a Random Forest e os modelos de fronteira suave —
 apresentada no experimento principal como evidência de superioridade da floresta aleatória — **desaparece
 por completo com uma única alteração de pré-processamento**, sem qualquer mudança de algoritmo, de
 hiperparâmetro ou de dados.
@@ -363,17 +488,18 @@ equivalentes. A pergunta relevante não é qual algoritmo escolher, mas como rep
 ### 3.4 Sem vazamento, os modelos detectam apenas a ausência de nota fiscal
 
 Na configuração `no_leak`, o desempenho cai substancialmente e — resultado notável — **a ordem entre os
-algoritmos se inverte** no cenário `exact`: o SVM (0,7808) supera a Random Forest (0,7568), que por sua
-vez supera a Regressão Logística (0,6799). A conclusão de que "a Random Forest é o melhor algoritmo para
+algoritmos se inverte** no cenário `exact`: o SVM (0,7837) supera a Random Forest (0,7630), que por sua
+vez supera a Regressão Logística (0,6815). A conclusão de que "a Random Forest é o melhor algoritmo para
 conciliação" não sobrevive à remoção do vazamento.
 
 Mais importante é a **natureza** do que resta ser detectado. Decompondo os acertos na classe negativa do
-conjunto de teste (203 registros sem correspondência e 251 registros pareados mas divergentes):
+conjunto de teste (208 registros sem correspondência e 246 registros pareados mas divergentes):
 
 | Modelo (`no_leak`, `exact`) | Sem correspondência detectados | Divergentes detectados |
 | --- | --- | --- |
-| Random Forest | 203 / 203 (100,0%) | 1 / 251 (0,4%) |
-| SVM (RBF) | 203 / 203 (100,0%) | 22 / 251 (8,8%) |
+| Random Forest | 208 / 208 (100,0%) | 1 / 246 (0,4%) |
+| SVM (RBF) | 208 / 208 (100,0%) | 22 / 246 (8,9%) |
+| Regressão Logística | 208 / 208 (100,0%) | 65 / 246 (26,4%) |
 
 Ou seja: **sem as variáveis da regra, os modelos identificam com perfeição os pagamentos que não possuem
 nota fiscal alguma, e são praticamente cegos às divergências de data e de valor.** Detectar a ausência de
@@ -382,7 +508,7 @@ por uma consulta SQL de uma linha. O sinal aparentemente residual do modelo `no_
 vazamento indireto: `nfse_valor_iss` e `nfse_aliquota` valem zero exatamente quando não há nota.
 
 A configuração `no_leak_strict` confirma o argumento ao remover também esses proxies. O desempenho colapsa
-para a faixa de 0,41 a 0,50 de F1-macro no cenário `exact` e de 0,25 a 0,35 no `fuzzy`. O SVM degenera
+para a faixa de 0,41 a 0,50 de F1-macro no cenário `exact` e de 0,26 a 0,33 no `fuzzy`. O SVM degenera
 para o classificador trivial: prediz a classe majoritária em 100% dos casos, obtendo acurácia de 0,6981 —
 exatamente a proporção de registros conciliados na base (1.050/1.504) — com recall nulo na classe de
 exceção.
@@ -481,11 +607,27 @@ Dez bases independentes, 7.500 registros cada, três algoritmos, mesma divisão 
 
 Os três atingiram o piso de precisão na validação em todas as dez execuções. A precisão **de teste** fica
 ligeiramente abaixo de 0,90 para a Random Forest (0,893) e para o SVM (0,900), e acima para a Regressão
-Logística (0,903) — o que é esperado e desejável: o limiar foi
-calibrado na validação e aplicado ao teste sem reajuste. Uma precisão de teste exatamente no piso seria
-indício de que o teste havia sido usado na calibração.
+Logística (0,903). Isso é esperado — o limiar foi calibrado na validação e aplicado ao teste sem reajuste
+—, mas a explicação completa não é apenas ruído amostral, e está em §4.9.
 
-**Wilcoxon pareado, correção de Holm para três comparações:**
+#### 4.3.1 Teste omnibus antes das comparações par a par
+
+Demšar (2006), citado aqui para o protocolo, recomenda um teste omnibus **antes** de qualquer comparação
+post-hoc: sem rejeitar a hipótese global de equivalência, três testes pareados dependentes não deveriam
+ser lidos. A versão anterior deste documento reportava apenas os testes par a par, invertendo essa ordem.
+O teste de Friedman sobre as dez sementes:
+
+| Métrica | χ² | p | Rank médio RF | Rank médio SVM | Rank médio RL | Rejeita? |
+| --- | --- | --- | --- | --- | --- | --- |
+| Recall da exceção | 18,20 | 0,00011 | 1,0 | 2,1 | 2,9 | sim |
+| PR-AUC da exceção | 18,20 | 0,00011 | 1,0 | 2,1 | 2,9 | sim |
+| Precisão da exceção | 4,20 | 0,1225 | 2,5 | 1,9 | 1,6 | **não** |
+
+A leitura das três linhas em conjunto é o resultado mais importante desta seção, e será retomada em §4.4.
+
+#### 4.3.2 Comparações par a par, com correção de Holm
+
+Na métrica primária, o recall da exceção:
 
 | Comparação | Diferença mediana | p | p (Holm) | Significativo |
 | --- | --- | --- | --- | --- |
@@ -493,12 +635,77 @@ indício de que o teste havia sido usado na calibração.
 | Random Forest × Regressão Logística | +4,56 p.p. | 0,0020 | 0,0059 | sim |
 | SVM × Regressão Logística | +3,00 p.p. | 0,0039 | 0,0059 | sim |
 
+#### 4.3.3 A objeção da precisão desigual, e a evidência que a responde
+
+O recall é medido no ponto de operação de cada algoritmo, e esses pontos **não caem sobre a mesma
+precisão realizada**: 0,893 para a Random Forest contra 0,903 para a Regressão Logística. Como recall e
+precisão se trocam um pelo outro, um leitor atento pode objetar que a vantagem de recall da floresta foi
+em parte *comprada* com precisão, e que a comparação não é feita em condições iguais. A objeção é
+legítima e precisa ser respondida com evidência, não com uma justificativa.
+
+Duas evidências, das mesmas dez execuções, a respondem.
+
+**Primeira: o ordenamento se mantém em uma métrica que não depende de limiar algum.** A PR-AUC da classe
+de exceção resume a curva inteira, sem escolher ponto de operação:
+
+| Comparação | Diferença mediana de PR-AUC | p | p (Holm) | Significativo |
+| --- | --- | --- | --- | --- |
+| Random Forest × SVM | +0,0088 | 0,0020 | 0,0059 | sim |
+| Random Forest × Regressão Logística | +0,0210 | 0,0020 | 0,0059 | sim |
+| SVM × Regressão Logística | +0,0125 | 0,0059 | 0,0059 | sim |
+
+Mesmo ordenamento, mesma significância, sem limiar envolvido.
+
+**Segunda: as diferenças de precisão não são estatisticamente distinguíveis de ruído.** Aplicado o mesmo
+teste pareado à precisão da exceção, nenhuma comparação sobrevive à correção:
+
+| Comparação | Diferença mediana de precisão | p | p (Holm) | Significativo |
+| --- | --- | --- | --- | --- |
+| Random Forest × SVM | −0,0033 | 0,2754 | 0,5508 | não |
+| Random Forest × Regressão Logística | −0,0076 | 0,0840 | 0,2520 | não |
+| SVM × Regressão Logística | −0,0078 | 0,5566 | 0,5566 | não |
+
+E o omnibus da tabela de §4.3.1 diz o mesmo de forma mais direta: sobre a precisão, o teste de Friedman
+**não rejeita** a equivalência entre os três (p = 0,1225).
+
+Em conjunto: a Random Forest ordena melhor as exceções (PR-AUC, p = 0,0059) e detecta mais delas
+(recall, p = 0,0059), **sem** operar a uma precisão estatisticamente menor (p de Friedman = 0,1225). A
+vantagem não foi comprada com precisão.
+
+#### 4.3.4 A matriz de confusão, e não apenas os agregados
+
+A verificação nº 6 do próprio checklist deste trabalho (§7.3) exige reportar a matriz completa: foi a
+matriz, e não as métricas agregadas, que revelou a assimetria 128/0 do experimento principal. Aplicá-la ao
+experimento que este trabalho apresenta como o bom é uma questão de coerência. Somadas as dez sementes
+(15.000 pares de teste, dos quais 4.500 exceções):
+
+| Algoritmo | Exceções detectadas | Divergências silenciadas | Revisões redundantes | Pares aprovados corretamente |
+| --- | --- | --- | --- | --- |
+| Random Forest | 3.697 | **803** | 446 | 10.054 |
+| SVM (RBF) | 3.601 | 899 | 405 | 10.095 |
+| Regressão Logística | 3.464 | **1.036** | 374 | 10.126 |
+
+Lida em unidades de controle interno, e não em pontos percentuais, a tabela diz o seguinte: trocar a
+Random Forest pela Regressão Logística silencia **233 divergências a mais** em 15.000 pagamentos, e
+poupa 72 revisões manuais. É essa a troca que a escolha do algoritmo representa, e ela é mais legível
+aqui do que em qualquer diferença de F1.
+
 ### 4.4 A resposta à primeira pergunta de pesquisa
 
 > Sob rotulagem independente das features e critério derivado do objetivo de controle, a **Random Forest**
 > detecta **1,44 pontos percentuais** a mais de divergências que o SVM e **4,56** a mais que a Regressão
-> Logística, mantendo o piso de precisão de 0,90 na validação (Wilcoxon pareado, *p* = 0,0059 após
-> correção de Holm, 10 execuções), ao custo de encaminhar **27,6%** do lote para revisão manual.
+> Logística, mantendo o piso de precisão de 0,90 na validação, ao custo de encaminhar **27,6%** do lote
+> para revisão manual. O ordenamento é rejeitado como equivalente pelo teste de Friedman
+> (χ² = 18,20; *p* = 0,00011) e confirmado nas comparações par a par (Wilcoxon pareado, *p* = 0,0059 após
+> correção de Holm, 10 execuções). Ele se mantém sob a PR-AUC, que não depende de limiar
+> (*p* = 0,0059), e **não é explicado por precisão desigual**: sobre a precisão da exceção o Friedman não
+> rejeita a equivalência (*p* = 0,1225).
+
+Três propriedades sustentam essa formulação, e vale explicitar por que são necessárias **em conjunto**.
+O omnibus autoriza a leitura das comparações par a par. A PR-AUC mostra que o ordenamento não é um
+artefato do ponto de operação escolhido. E a ausência de diferença significativa em precisão elimina a
+leitura de que a floresta apenas opera mais frouxamente. Faltando qualquer uma delas, "a Random Forest
+detecta mais divergências" seria uma afirmação sobre o limiar, e não sobre o algoritmo.
 
 A significância estatística não deve ser confundida com relevância prática. A diferença entre a Random
 Forest e o SVM é de **1,44 pontos percentuais**: em uma carteira de 7.500 pagamentos com 30% de exceções,
@@ -594,11 +801,25 @@ silenciosa que produz conclusão substantiva e errada, sem se manifestar como er
 | Scorer na classe errada (§4.7) | SVM em 0,088 | "o SVM não serve para conciliação" |
 | Variável constante no treino (§4.6) | SVM em 0,221, bimodal | "o SVM é instável em conciliação" |
 
-Os três produziriam tabelas plausíveis. Dois deles foram encontrados por revisão adversarial do código, e
-não pelas métricas — que em nenhum dos casos exibiram sinal de anomalia. A contribuição metodológica não é
-"verifique vazamento": é que **a verificação precisa ser sistemática e adversarial, porque cada instrumento
-só enxerga o modo de falha para o qual foi construído**. O guarda anti-vazamento é útil e não teria
-detectado dois dos três.
+A auditoria posterior acrescentou outros dois, ambos no gerador do experimento principal e ambos
+descritos em §2.7 e §2.8, o que leva a cinco o total documentado:
+
+| # | Achado | Sintoma | Conclusão falsa que sustentaria |
+| --- | --- | --- | --- |
+| 1 | Vazamento de rótulo (§2.1) | acurácia 1,0000 com dispersão nula | a Random Forest resolve a conciliação |
+| 2 | Scorer na classe errada (§4.7) | SVM em 0,088 | o SVM não serve para conciliação |
+| 3 | Variável constante no treino (§4.6) | SVM em 0,221, bimodal | o SVM é instável em conciliação |
+| 4 | Fluxo pseudoaleatório compartilhado (§2.7) | 7.518 linhas a partir de 7.500 pagamentos | as duas fontes são independentes |
+| 5 | Pipeline não determinístico (§2.8) | nenhum — o teste de reprodutibilidade passava | os resultados são reproduzíveis |
+
+Os cinco produziriam tabelas plausíveis. Nenhum se manifestou como erro, e quatro foram encontrados por
+revisão adversarial do código, não pelas métricas — que em nenhum dos casos exibiram sinal de anomalia. O
+quinto é o mais instrutivo: havia um teste automatizado escrito exatamente para ele, chamado
+`test_generate_payment_records_reproducible`, e ele **passava**, porque comparava duas chamadas dentro de
+um mesmo processo. A contribuição metodológica não é "verifique vazamento": é que **a verificação precisa
+ser sistemática e adversarial, porque cada instrumento só enxerga o modo de falha para o qual foi
+construído** — e porque um teste pode medir uma propriedade mais fraca do que a que seu nome anuncia. O
+guarda anti-vazamento é útil e não teria detectado quatro dos cinco.
 
 **Ressalva de honestidade.** O artefato foi reduzido, não eliminado. Com cinco pagamentos por fornecedor,
 uma linha de treino contribui para a mediana do próprio fornecedor, de modo que seu desvio é encolhido em
@@ -623,7 +844,88 @@ Vale notar que **os dois defeitos se acumulavam sobre o mesmo algoritmo**, cada 
 razão diferente. Isso é instrutivo: encontrar e corrigir um deles não revelou o outro, porque o resultado
 continuou plausível — um SVM em 0,312 ainda parecia "simplesmente pior", e teria sido reportado como tal.
 
-### 4.8 O que este experimento permite afirmar, e o que não
+### 4.8 Catorze atributos carregando treze direções
+
+`retencao_implicita_pct` é definido como `(1 − razao_valor) × 100`. É uma transformação afim de
+`razao_valor`, não uma evidência independente: os dois atributos têm correlação exatamente −1, e o
+relatório do guarda anti-vazamento o demonstra sem ambiguidade — as duas colunas registram acurácia de
+toco **idêntica até a décima sexta casa decimal**, nas dez sementes (0,811111…, 0,811333…, e assim por
+diante). A matriz de evidências tem catorze colunas e treze direções.
+
+O efeito é assimétrico entre os algoritmos, e na direção que **não** favorece a conclusão. A Random
+Forest divide uma coluna de cada vez e é indiferente à duplicata. O SVM e a Regressão Logística operam
+sobre variáveis padronizadas, e uma direção representada duas vezes recebe peso dobrado no espaço
+padronizado. Se a redundância distorce a comparação, portanto, é penalizando os dois algoritmos que
+ficaram atrás — nunca inflando a floresta.
+
+Os dois atributos foram mantidos, e não é por descuido. Remover uma coluna altera a geometria
+padronizada e, com ela, todas as métricas publicadas; a redundância foi descoberta na auditoria, depois
+de os resultados estarem produzidos. A escolha foi documentá-la no módulo, fixá-la em teste
+(`test_razao_valor_and_retencao_are_the_known_exact_redundancy`) e declará-la aqui, em vez de reparar em
+silêncio. Um segundo teste
+(`test_no_other_feature_pair_is_perfectly_collinear`) garante que esta continua sendo a única: um novo par
+perfeitamente colinear falha a suíte.
+
+---
+
+### 4.9 O viés de seleção do limiar, e por que a precisão de teste fica abaixo do piso
+
+A precisão de teste da Random Forest é 0,893, abaixo do piso de 0,90 que a regra de decisão impõe. A
+versão anterior deste documento tratava isso como "esperado e desejável", atribuindo-o ao fato de o limiar
+ter sido calibrado na validação e aplicado ao teste sem reajuste. A afirmação está correta mas é
+incompleta, e a parte omitida é a mais interessante.
+
+`choose_threshold` percorre **todos** os pontos de corte da curva precisão-recall da validação — alguns
+milhares — e escolhe o de maior recall entre os que atingem o piso. Isso não é uma estimativa: é um
+**procedimento de seleção** sobre milhares de candidatos. O ponto vencedor tende sistematicamente a ser
+aquele cuja precisão de validação cruzou o piso *por sorte*, e não aquele cuja precisão verdadeira o
+cruza. É a maldição do vencedor, e ela prevê exatamente o que se observa: o mesmo limiar cai abaixo do
+piso no teste com mais frequência do que o ruído amostral sozinho explicaria.
+
+A correção é barata e está implementada, embora desligada por padrão: `comparison.precision_margin`
+exige `piso + margem` na validação. Com margem 0,0 o comportamento é idêntico ao que produziu todos os
+artefatos publicados, e é por isso que o padrão é 0,0 — mudá-lo move o ponto de operação e portanto todas
+as métricas reportadas. Registre-se, então, o que a regra de decisão de fato entrega: **o piso de 0,90 é
+garantido na validação e aproximado no teste**, com desvio da ordem de 0,007 para a floresta. Uma
+margem de 0,01 a 0,02, com o correspondente custo em recall, faria o piso valer também fora da amostra.
+
+O ponto interessa além deste experimento: a mesma maldição do vencedor atinge qualquer pipeline que
+escolha um limiar operacional maximizando uma métrica sob restrição em outra, o que é o padrão em sistemas
+de detecção de exceção. Vale como item de checklist (§7.3).
+
+---
+
+### 4.10 O que os não-pares são, e o que as dez bases são
+
+Duas delimitações que o desenho exige e que nenhuma métrica revela.
+
+**Os não-pares são o mesmo pagamento com evidência corrompida.** No gerador, o pagamento *i* referencia
+sempre a nota *i*, e seu valor é derivado do valor de serviços da nota *i* — inclusive quando o rótulo diz
+que o par não é genuíno. Um "não-par" não é, portanto, um pagamento pertencente a outro fornecedor ou a
+outra nota: é o mesmo pagamento com uma a três dimensões de evidência corrompidas (prazo, texto,
+município) e, nos 70% de negativos *soft*, uma retenção fora de qualquer faixa legal.
+
+Isso é deliberado — é o que torna difíceis os *hard negatives*, que preservam retenção legítima e se
+distinguem apenas pelas outras dimensões — mas delimita o que foi demonstrado. Os algoritmos discriminam
+**evidência corrompida**, não **contraparte errada**. A conciliação real inclui o segundo problema:
+decidir, entre as notas em aberto de vários fornecedores, qual delas um pagamento quita. Esse é o problema
+de geração de candidatos de §2.6, e permanece fora do experimento.
+
+**As dez bases são dez sementes de um gerador, não dez conjuntos de dados.** A expressão "dez bases
+independentes" é literalmente verdadeira — as amostras são independentes entre si — e convida a uma
+leitura que não se sustenta. Demšar (2006) trata de comparações sobre múltiplos *conjuntos de dados*,
+cada um com sua própria distribuição conjunta; aqui há um único processo gerador, parametrizado por
+`config.yaml`, amostrado dez vezes. O teste de Friedman e os Wilcoxon pareados medem, portanto, a
+**estabilidade do ordenamento sob reamostragem**, e não a generalização entre regimes de dados.
+
+A distinção tem consequência prática e aponta o experimento que falta: varrer `hard_negative_rate` (§8,
+item 11) produziria regimes genuinamente distintos. Com 5,2 pontos percentuais separando o melhor do pior
+algoritmo, é inteiramente plausível que o ordenamento se altere em outro regime de dificuldade — e esse
+seria um resultado mais informativo do que o ranking atual.
+
+---
+
+### 4.11 O que este experimento permite afirmar, e o que não
 
 | Pergunta | Experimento original | Experimento de comparação |
 | --- | --- | --- |
@@ -685,7 +987,7 @@ apresentação oral, antes que a banca as levante.
 | 26 | **A dificuldade da tarefa é um parâmetro escolhido.** `hard_negative_rate: 0.30` determina quanto da base é resolvível apenas pela razão de valor. Um valor diferente moveria as três médias. O valor usado foi fixado antes de observar os resultados e não foi ajustado depois — mas isso é uma afirmação sobre o processo, não uma propriedade verificável do artefato. | Alta |
 | 27 | **Resíduo do artefato de escala em `desvio_prazo_fornecedor`.** Com cinco pagamentos por fornecedor, uma linha de treino contribui para a mediana do próprio fornecedor e tem o desvio encolhido em relação a uma linha de teste: na configuração de 7.500 registros, desvio-padrão de cerca de 13,8 no treino contra 18,5 no teste, com as linhas extremas em |z| ≈ 5. É o mesmo mecanismo de §4.6 em amplitude muito menor, mas não é zero. Uma mediana *leave-one-out* o eliminaria. | Média |
 | 28 | **A similaridade textual é acoplada à partição.** O `TfidfVectorizer` é reajustado a cada chamada de `build_features_v2`, de modo que o IDF de um registro depende de com quais outros ele foi processado — a mesma acoplagem transdutiva que o estudo critica, em escala menor. Como consequência, `similaridade_descricao` não é computável para um registro novo isolado em inferência. | Média |
-| 29 | **O guarda anti-vazamento só enxerga um modo de falha.** Ele detecta variáveis que predizem o rótulo *bem demais*. Não detecta variáveis constantes no treino, nem incompatibilidade de escala entre partições — que foram exatamente os defeitos de §4.6. A suíte ganhou asserções para esses casos, mas a lista de verificações continua sendo enumerada por descoberta, não por construção. | Alta |
+| 29 | **O guarda anti-vazamento só enxerga um modo de falha.** Ele detecta variáveis que predizem o rótulo *bem demais*. Não detecta variáveis constantes no treino, nem incompatibilidade de escala entre partições — que foram exatamente os defeitos de §4.6. A suíte ganhou asserções para os dois casos (`test_no_feature_column_is_constant_on_train` e `test_train_and_test_scales_are_comparable`), mas a lista de verificações continua sendo enumerada por descoberta, não por construção. | Alta |
 
 ### 5.5 Limitações de implementação e documentação
 
@@ -694,10 +996,17 @@ apresentação oral, antes que a banca as levante.
 | 21 | ~~**Divergência entre documentação e código.**~~ **Resolvida:** o `README.md` descrevia `is_mesmo_municipio`, que não existe em `features.py`; a tabela agora documenta `cnpj_match`, que é o que o código usa. | Resolvida |
 | 22 | **Variável constante em produção.** `cnpj_match` assume valor 1 em 100% dos registros, sem contribuição informacional. | Baixa |
 | 23 | **Codificação por sentinela.** `delta_days = 9999` e `delta_valor_pct = 100` para ausência de correspondência distorcem a padronização e prejudicam modelos sensíveis à escala — responsável integral pela diferença entre algoritmos (§3.3). | Alta |
+| 30 | **As duas fontes do experimento principal compartilhavam o fluxo pseudoaleatório** (§2.7). `generate_payment_records` e `generate_nfse` recebiam a mesma semente e sorteavam CNPJs da mesma sequência, o que produziu 277 notas cujo tomador é um fornecedor, 18 colisões de prestador, 7.518 linhas a partir de 7.500 pagamentos e 12 pagamentos com rótulos contraditórios. **Não herdada pelo experimento de comparação**, cujo gerador usa um único fluxo para as duas fontes. | Alta |
+| 31 | ~~**O pipeline principal não era determinístico**~~ (§2.8). **Resolvida:** a lista de CNPJs passou a ser construída na ordem de sorteio, em vez de `list(set(...))`, e a janela de datas foi ancorada em `simulation.reference_date` em vez de no relógio. A suíte ganhou a verificação entre processos que o teste anterior, executado em processo único, não podia fazer. Os artefatos publicados foram regenerados sob a implementação corrigida. | Resolvida |
+| 32 | **Redundância exata entre dois atributos** (§4.8). `retencao_implicita_pct` é transformação afim de `razao_valor`; a matriz tem catorze colunas e treze direções. Inerte para a floresta, penaliza os dois algoritmos padronizados — isto é, atua contra a conclusão, nunca a favor. | Baixa |
+| 33 | **Viés de seleção na escolha do limiar** (§4.9). O limiar é o de maior recall entre milhares que atingem o piso na validação, o que seleciona sistematicamente pontos cuja precisão cruzou o piso por sorte. O piso de 0,90 vale na validação e é apenas aproximado no teste (0,893 para a floresta). `precision_margin` corrige, mas alterá-lo moveria todas as métricas publicadas. | Média |
+| 34 | **Os não-pares são o mesmo pagamento com evidência corrompida** (§4.10), e não um pagamento de outra contraparte. Os algoritmos discriminam evidência corrompida, não contraparte errada — que é a metade do problema de conciliação real eliminada junto com a geração de candidatos (limitação 10). | Alta |
+| 35 | **Dez sementes de um gerador não são dez conjuntos de dados** (§4.10). Os testes medem estabilidade do ordenamento sob reamostragem de um único processo gerador, não generalização entre regimes. A varredura de `hard_negative_rate` (§8, item 11) é o que converteria isso em evidência de generalização. | Média |
 
-> **Nota.** As limitações 4, 7, 12, 20 e 21 foram resolvidas ao longo deste trabalho, e cada uma indica
-> o escopo de sua resolução. As demais permanecem, e as de gravidade **Alta** devem ser assumidas
-> espontaneamente no texto e na apresentação oral.
+> **Nota.** As limitações 4, 7, 12, 20, 21 e 31 foram resolvidas ao longo deste trabalho, e cada uma
+> indica o escopo de sua resolução. As demais permanecem, e as de gravidade **Alta** — 1, 3, 9, 10, 11,
+> 13, 18, 19, 23, 24, 25, 26, 29, 30 e 34 — devem ser assumidas espontaneamente no texto e na
+> apresentação oral, antes que a banca as levante.
 
 ---
 
@@ -710,21 +1019,21 @@ determinísticas sobre variáveis que também compõem o vetor de atributos. A c
 relatar o vazamento — o fenômeno é conhecido — mas em **medir sua magnitude e demonstrar que ele é o modo
 de falha esperado, e não excepcional, da aplicação de aprendizado supervisionado à conciliação contábil**,
 dado que a esmagadora maioria das organizações só dispõe de rótulos gerados por suas próprias regras de
-negócio. A queda de 1,0000 para 0,7568 e, sem os proxies, para 0,4966 de F1-macro estabelece um
+negócio. A queda de 1,0000 para 0,7630 e, sem os proxies, para 0,4976 de F1-macro estabelece um
 referencial numérico para o custo de ignorar essa circularidade.
 
 **6.2 Demonstração experimental de que o ranking entre algoritmos é artefato da representação.**
 A configuração `sentinel_fixed` mostra que os três classificadores atingem desempenho idêntico e perfeito
 mediante uma única alteração de pré-processamento, sem mudança de algoritmo. Combinada à explicação
-quantitativa da seção 2.2 — a faixa informativa de `delta_days` comprimida em 0,0085 desvios-padrão —, a
+quantitativa da seção 2.2 — a faixa informativa de `delta_days` comprimida em 0,0084 desvios-padrão —, a
 evidência sustenta o deslocamento da pergunta de pesquisa: **de "qual algoritmo é melhor para conciliação"
 para "qual representação dos dados torna a conciliação aprendível"**. A inversão de ordem entre SVM e
 Random Forest sob `no_leak` reforça que rankings obtidos sob representação inadequada não são estáveis.
 
 **6.3 Caracterização da assimetria de custo como propriedade estrutural do domínio.**
 O trabalho evidencia que classificadores otimizados para métricas simétricas erram sistematicamente na
-direção mais nociva ao controle interno (130 falsos positivos contra zero falsos negativos na linha de
-base; 250 contra zero sob `no_leak`; 50,4% dos parciais promovidos a conciliados). Isso fundamenta a
+direção mais nociva ao controle interno (128 falsos positivos contra zero falsos negativos na linha de
+base; 245 contra zero sob `no_leak`; 47,3% dos parciais promovidos a conciliados). Isso fundamenta a
 proposição de que **conciliação financeira pertence à classe de problemas em que a métrica de avaliação
 deve ser derivada do objetivo de controle, não da convenção estatística** — articulando aprendizado
 sensível a custo com estruturas normativas de controle interno, ponte pouco explorada na literatura de
@@ -774,14 +1083,26 @@ Do estudo derivam verificações diretamente aplicáveis por equipes de engenhar
    contrário.
 3. Executar ablação por remoção progressiva das variáveis suspeitas antes de aceitar qualquer resultado.
 4. Substituir valores-sentinela por variável indicadora explícita de ausência (`has_match`) combinada com
-   imputação neutra — alteração que, neste estudo, elevou a Regressão Logística de 0,8873 para 1,0000 de
+   imputação neutra — alteração que, neste estudo, elevou a Regressão Logística de 0,8892 para 1,0000 de
    F1-macro e igualou os três algoritmos.
 5. Selecionar modelos por recall da classe de exceção sob restrição de precisão mínima, não por acurácia
    ou F1-macro.
 6. Reportar a matriz de confusão completa, e não apenas métricas agregadas — foi a matriz que revelou a
-   assimetria 130/0, e foi a decomposição por tipo de divergência que revelou a cegueira dos modelos às
-   exceções reais.
+   assimetria de 128 falsos positivos contra zero falsos negativos, e foi a decomposição por tipo de
+   divergência que revelou a cegueira dos modelos às exceções reais.
 7. Validar temporalmente quando os dados possuem dimensão temporal.
+8. **Verificar reprodutibilidade entre processos, e não dentro de um.** Um teste que chama o gerador duas
+   vezes no mesmo interpretador não observa a ordem de iteração de conjuntos nem o *hash seed*, e passa
+   sob qualquer uma delas (§2.8). Fixe `PYTHONHASHSEED` em dois subprocessos e compare.
+9. **Ancorar toda janela temporal em data explícita**, nunca em "hoje": uma base gerada contra o relógio
+   muda a cada execução e a mudança não aparece em métrica agregada alguma.
+10. **Semear fontes distintas com sementes distintas.** Duas fontes "independentes" derivadas da mesma
+    semente compartilham a sequência e produzem coincidências impossíveis entre elas (§2.7).
+11. **Comparar algoritmos também em métrica livre de limiar.** Pontos de operação escolhidos por
+    algoritmo não caem sobre a mesma precisão realizada; sem PR-AUC, um ganho de recall é
+    indistinguível de um limiar mais frouxo (§4.3.3).
+12. **Exigir margem acima do piso ao calibrar o limiar.** Maximizar recall sobre milhares de cortes
+    seleciona o ponto que cruzou o piso por sorte, e o piso não se sustenta fora da amostra (§4.9).
 
 **7.4 Evidência para decisão de investimento em automação.**
 Os resultados sustentam recomendação concreta para organizações: **quando a regra de conciliação é
@@ -826,7 +1147,7 @@ Neural Information Processing Systems (NeurIPS), 2015]`.
 Os itens 1, 2, 4, 6, 8 e 9 da agenda original **já foram executados** e integram as seções 3 e 4. Os
 demais permanecem em aberto, em ordem de retorno esperado:
 
-1. ~~Replicar sem as variáveis vazadas.~~ **Executado** (§3.4): F1-macro cai de 1,0000 para 0,7568 (RF,
+1. ~~Replicar sem as variáveis vazadas.~~ **Executado** (§3.4): F1-macro cai de 1,0000 para 0,7630 (RF,
    `exact`) e a ordem entre algoritmos se inverte.
 2. ~~Substituir a sentinela por indicador explícito.~~ **Executado** (§3.3): a diferença entre Random
    Forest e modelos de fronteira suave desaparece integralmente.
@@ -856,9 +1177,17 @@ demais permanecem em aberto, em ordem de retorno esperado:
 12. **Adotar mediana *leave-one-out* para o prazo do fornecedor.** Elimina o resíduo de escala da
     limitação 27, e é o fecho natural do achado de §4.6.
 13. **Ampliar o conjunto de verificações automatizadas de representação.** O guarda anti-vazamento cobre
-    um modo de falha; a suíte ganhou asserções para variável constante e escala entre partições. Um
-    catálogo sistemático — deriva de distribuição entre partições, colunas de variância quase nula,
-    features com correlação perfeita entre si — transformaria a lição de §4.6 em ferramenta.
+    um modo de falha; a suíte ganhou asserções para variável constante, escala entre partições e
+    colinearidade perfeita não declarada. Um catálogo sistemático — deriva de distribuição entre
+    partições, colunas de variância quase nula, reprodutibilidade entre processos — transformaria a
+    lição de §4.6 em ferramenta.
+14. **Ativar a margem de precisão e medir o que ela custa.** `precision_margin` está implementado e
+    desligado (§4.9). Uma varredura de 0,00 a 0,03 mostraria quanto recall compra o cumprimento do piso
+    fora da amostra, e converteria a limitação 33 em resultado.
+15. **Modelar contraparte errada, e não apenas evidência corrompida.** Hoje um não-par é o mesmo
+    pagamento com dimensões corrompidas (§4.10). Sortear a nota candidata entre as notas em aberto de
+    outros fornecedores aproximaria o desenho da conciliação real e daria conteúdo ao item 5 desta
+    agenda.
 
 ---
 
@@ -870,16 +1199,16 @@ quantifica, converte vulnerabilidade em demonstração de rigor.
 **"Por que a Random Forest acertou 100%?"**
 > Porque o rótulo é uma função determinística de duas variáveis que também são entradas do modelo. Isso
 > configura vazamento de rótulo. Identifiquei o problema durante a análise e o submeti a teste: removendo
-> essas duas variáveis, o F1-macro cai de 1,0000 para 0,7568; removendo também as variáveis de ISS, que
-> funcionam como proxy da existência da nota, cai para 0,4966 — praticamente o acaso. Optei por manter o
+> essas duas variáveis, o F1-macro cai de 1,0000 para 0,7630; removendo também as variáveis de ISS, que
+> funcionam como proxy da existência da nota, cai para 0,4976 — praticamente o acaso. Optei por manter o
 > desenho original e documentar o achado, porque ele representa exatamente a armadilha em que
 > organizações incorrem ao treinar modelos sobre rótulos gerados por suas próprias regras de negócio.
 
 **"Então o trabalho não demonstra qual algoritmo é melhor?"**
-> Não demonstra, e essa é a conclusão. Demonstrei experimentalmente que a diferença de 9 pontos
-> percentuais entre a Random Forest e os demais era artefato de pré-processamento: o valor-sentinela 9999,
-> usado para marcar pagamentos sem nota, domina a padronização e comprime toda a faixa de 0 a 30 dias de
-> defasagem em 0,0085 desvios-padrão. Substituindo a sentinela por uma variável indicadora, os três
+> Não demonstra, e essa é a conclusão. Demonstrei experimentalmente que a diferença de 11 pontos
+> percentuais de F1-macro entre a Random Forest e os demais era artefato de pré-processamento: o
+> valor-sentinela 9999, usado para marcar pagamentos sem nota, domina a padronização e comprime toda a
+> faixa de 0 a 30 dias de defasagem em 0,0084 desvios-padrão. Substituindo a sentinela por uma variável indicadora, os três
 > algoritmos passam a acertar 100% — inclusive a Regressão Logística. E quando removo o vazamento, a
 > ordem se inverte: o SVM supera a Random Forest. Rankings obtidos sob representação inadequada não são
 > estáveis.
@@ -904,12 +1233,31 @@ quantifica, converte vulnerabilidade em demonstração de rigor.
 > mesmo construí para detectar esse tipo de problema. A conclusão metodológica é que cada instrumento de
 > verificação só enxerga o modo de falha para o qual foi construído.
 
+**"A Random Forest só não estava operando com precisão mais baixa?"**
+> Essa é a objeção certa, porque o limiar de cada algoritmo é escolhido separadamente e a precisão de
+> teste não cai no mesmo ponto para os três — 0,893 para a floresta contra 0,903 para a regressão. Testei
+> as duas coisas que a respondem. Primeiro, o ordenamento se mantém na PR-AUC, que resume a curva inteira
+> e não depende de limiar nenhum: mesma ordem, p = 0,0059 após Holm. Segundo, apliquei o mesmo teste
+> pareado à própria precisão, e nenhuma comparação sobrevive à correção; o Friedman sobre precisão não
+> rejeita a equivalência, com p = 0,12. Ou seja: a floresta ordena melhor e detecta mais, sem operar a uma
+> precisão estatisticamente menor. Se faltasse qualquer uma dessas duas evidências, eu não poderia
+> atribuir a diferença ao algoritmo.
+
+**"Você garante o piso de precisão de 0,90?"**
+> Na validação, sim, nas trinta execuções. No teste, não exatamente: a floresta entrega 0,893. E a
+> explicação não é só ruído amostral. O limiar é escolhido maximizando recall entre alguns milhares de
+> cortes que atingem o piso, o que é um procedimento de seleção — tende a escolher o ponto cuja precisão
+> cruzou o piso por sorte. É a maldição do vencedor. O código já tem o parâmetro que corrige, exigindo uma
+> margem acima do piso na validação; deixei-o desligado porque ligá-lo muda o ponto de operação e todas as
+> métricas publicadas. O que reporto, então, é o que a regra de fato entrega: piso garantido na validação,
+> aproximado no teste, com desvio da ordem de 0,007.
+
 **"Qual é a utilidade prática, então?"**
 > Três resultados acionáveis. Primeiro: quando a regra de conciliação é conhecida, aprendizado de máquina
 > não agrega sobre a implementação direta da regra — sem o vazamento, o que os modelos detectam é apenas
 > a ausência de nota fiscal, que é uma junção SQL. Segundo: a codificação de ausência por
 > valores-sentinela inviabiliza modelos sensíveis à escala, e a correção é trivial e mensurável. Terceiro,
-> e mais importante para auditoria: os modelos erraram 130 vezes por falso positivo e nenhuma por falso
+> e mais importante para auditoria: os modelos erraram 128 vezes por falso positivo e nenhuma por falso
 > negativo — ou seja, na direção que silencia divergências. Isso indica que a métrica de seleção em
 > conciliação deve ser o recall da classe de exceção, não a acurácia.
 
@@ -966,7 +1314,12 @@ consultado.
 
 ## Anexo A — Reprodução do experimento de ablação
 
+A ablação lê os CSVs rotulados que o pipeline principal escreve em `data/processed/`, e falha com
+`FileNotFoundError` se eles não existirem. Os dois cenários precisam ter sido executados antes:
+
 ```bash
+python run_pipeline.py --scenario exact
+python run_pipeline.py --scenario fuzzy
 python run_ablation.py
 ```
 
@@ -993,12 +1346,15 @@ python run_comparison.py              # completo: 10 sementes
 Saídas em `data/results/comparison/`:
 
 ```text
-per_seed_metrics.csv     # 30 linhas: 10 sementes × 3 algoritmos
-wilcoxon.csv             # 3 comparações: p bruto, p corrigido (Holm), tamanho de efeito
-decision_summary.csv     # tabela final, com n_seeds_applicable
-leak_guard_report.csv    # acurácia do toco por variável, por semente
-pr_curves.png            # curvas precisão-recall da classe de exceção (primeira semente)
-recall_boxplot.png       # dispersão do recall de exceção entre as 10 sementes
+per_seed_metrics.csv       # 30 linhas: 10 sementes × 3 algoritmos, com as células da matriz
+decision_summary.csv       # tabela final, com n_seeds_applicable
+friedman.csv               # omnibus sobre recall, PR-AUC e precisão — antes das comparações par a par
+wilcoxon.csv               # post-hoc na métrica primária: p bruto, p (Holm), tamanho de efeito
+wilcoxon_secundarias.csv   # o mesmo post-hoc sobre PR-AUC e sobre precisão da exceção
+confusion_matrices.csv     # células da classe de exceção, somadas sobre as sementes
+leak_guard_report.csv      # acurácia do toco por variável, por semente
+pr_curves.png              # curvas precisão-recall da classe de exceção (primeira semente)
+recall_boxplot.png         # dispersão do recall de exceção entre as 10 sementes
 ```
 
 O guarda anti-vazamento roda antes de cada treino e **interrompe a execução** se qualquer variável
