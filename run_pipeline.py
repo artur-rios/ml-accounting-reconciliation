@@ -2,6 +2,8 @@ import argparse
 from datetime import date
 from pathlib import Path
 
+import pandas as pd
+
 from reconciliacao.etl.cleaner import clean_nfse, clean_pagamentos
 from reconciliacao.etl.labeler import label_records
 from reconciliacao.etl.loader import load_nfse, load_pagamentos
@@ -59,11 +61,27 @@ def run(scenario: str, cfg: dict) -> None:
     )
     df_reconciled["scenario"] = scenario
     processed_dir.mkdir(parents=True, exist_ok=True)
-    df_reconciled.to_csv(processed_dir / f"{scenario}_reconciliado.csv", index=False)
+    processed_path = processed_dir / f"{scenario}_reconciliado.csv"
+    df_reconciled.to_csv(processed_path, index=False)
     print(f"    Label distribution:\n{df_reconciled['label'].value_counts().to_string()}")
 
     print("[3/5] Building features...")
-    X, y = build_features(df_reconciled)
+    # Features are built from the persisted CSV, not from the frame still in
+    # memory, so that this pipeline and everything that consumes its output --
+    # run_ablation.py and the notebooks -- compute on byte-identical input.
+    #
+    # The two are not equivalent, and the difference is instructive. A CSV
+    # round-trip perturbs delta_valor_pct by about 1e-14 on 94 of 7,518 rows,
+    # which is pure float repr noise. That noise survives StandardScaler and
+    # reaches lbfgs near its convergence tolerance, and the cross-validated
+    # F1-macro of the logistic regression in the fuzzy scenario moves from
+    # 0.8678 to 0.8674 -- a 3e-4 shift from a 1e-14 input difference, landing
+    # exactly in the fourth decimal the write-up reports. Test-set metrics and
+    # the selected hyperparameter are unaffected.
+    #
+    # Reading back is the honest direction: the CSV is the artifact a reader
+    # can inspect, so it should be the artifact the model is fitted on.
+    X, y = build_features(pd.read_csv(processed_path))
 
     print("[4/5] Training models (this may take a few minutes)...")
     training_results = train_all(X, y, cfg, results_dir / "models")

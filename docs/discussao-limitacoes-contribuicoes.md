@@ -24,7 +24,7 @@ Todos os números citados foram extraídos diretamente dos artefatos do reposit�
 | exact | Regressão Logística | 0,9149 | 0,8892 | 0,9457 | 0,8590 | 0,9081 ± 0,0089 | 0,9877 |
 | fuzzy | Random Forest | 1,0000 | 1,0000 | 1,0000 | 1,0000 | 0,9978 ± 0,0021 | — |
 | fuzzy | SVM (RBF) | 0,9182 | 0,8672 | 0,9264 | 0,8371 | 0,8611 ± 0,0137 | — |
-| fuzzy | Regressão Logística | 0,9282 | 0,8791 | 0,9664 | 0,8407 | 0,8678 ± 0,0151 | — |
+| fuzzy | Regressão Logística | 0,9282 | 0,8791 | 0,9664 | 0,8407 | 0,8674 ± 0,0155 | — |
 
 ### 1.2 Composição das bases
 
@@ -414,6 +414,37 @@ construída na ordem de sorteio, a janela de datas é ancorada em data fixa, e a
 reprodutibilidade entre processos. Verificou-se, além disso, que a ancoragem de datas **não move nenhuma
 métrica** do experimento de comparação — as dez sementes reproduzem os artefatos publicados bit a bit.
 
+### 2.9 Sexto achado: dois caminhos de código para o mesmo cálculo
+
+O pipeline principal construía a matriz de atributos a partir do quadro de dados ainda em memória; a
+ablação e os *notebooks* a constroem a partir do CSV que o pipeline acabara de gravar. Duas rotas para o
+mesmo cálculo, sobre os mesmos dados — e elas não davam o mesmo número.
+
+A ida e volta pelo CSV perturba `delta_valor_pct` em cerca de **1×10⁻¹⁴** em 94 das 7.518 linhas. É ruído
+de representação de ponto flutuante, sem significado algum: o valor gravado e o valor lido diferem no
+décimo quarto decimal. Esse ruído atravessa o `StandardScaler` e chega ao `lbfgs` nas vizinhanças de sua
+tolerância de convergência, e o F1-macro de validação cruzada da regressão logística no cenário `fuzzy`
+sai de **0,8678 para 0,8674**.
+
+A amplificação é de três ordens de grandeza — uma diferença de entrada de 10⁻¹⁴ produz uma diferença de
+saída de 3×10⁻⁴ — e cai exatamente na quarta casa decimal em que este trabalho reporta suas métricas. As
+métricas de teste e o hiperparâmetro selecionado não se alteram: o desacordo vive apenas no número de
+validação cruzada.
+
+**O que foi corrigido.** O pipeline passou a ler de volta o CSV que grava, de modo que existe um único
+caminho de código e um único conjunto de números. A escolha da direção não é arbitrária: o CSV é o
+artefato que um leitor pode inspecionar, e portanto deve ser o artefato sobre o qual o modelo é ajustado.
+Depois da correção, `run_pipeline.py`, `run_ablation.py` e os *notebooks* concordam até o último dígito.
+
+**Por que pertence à lista.** É o mesmo padrão dos outros cinco, na sua forma mais pura: nenhuma exceção,
+nenhum aviso, duas tabelas plausíveis que discordavam na quarta casa, e uma discrepância que só aparece
+quando alguém compara dois artefatos que ninguém tinha motivo para comparar. E ilustra um ponto que a
+§3.2 afirmava com folga demais — que a ablação reproduzia o experimento principal "com precisão de quatro
+casas decimais": reproduzia, exceto nesta célula, e a exceção passou despercebida porque a conferência
+nunca foi feita célula a célula.
+
+---
+
 ---
 
 ## 3. Experimento complementar de ablação
@@ -459,9 +490,11 @@ binária, e não por um valor extremo na escala contínua.
 | `no_leak` | 0,6526 | 0,6334 | **0,6540** |
 | `no_leak_strict` | **0,3313** | 0,2741 | 0,2618 |
 
-A configuração `full` reproduziu os valores do experimento principal com precisão de quatro casas
-decimais, apesar de executada sob versões mais recentes das bibliotecas (scikit-learn 1.9.0, pandas
-3.0.5). Isso constitui verificação independente da reprodutibilidade do pipeline.
+A configuração `full` reproduz hoje os valores do experimento principal **em todos os dígitos**, sob
+scikit-learn 1.9.0 e pandas 3.0.5. Nem sempre foi assim, e a exceção está documentada em §2.9: enquanto o
+pipeline ajustava sobre o quadro em memória e a ablação sobre o CSV gravado, a validação cruzada da
+regressão logística no cenário `fuzzy` discordava na quarta casa decimal. Unificado o caminho de código,
+a reprodução é exata e constitui verificação independente da reprodutibilidade do pipeline.
 
 ### 3.3 A diferença entre algoritmos era integralmente artefato de escala
 
@@ -811,15 +844,16 @@ descritos em §2.7 e §2.8, o que leva a cinco o total documentado:
 | 3 | Variável constante no treino (§4.6) | SVM em 0,221, bimodal | o SVM é instável em conciliação |
 | 4 | Fluxo pseudoaleatório compartilhado (§2.7) | 7.518 linhas a partir de 7.500 pagamentos | as duas fontes são independentes |
 | 5 | Pipeline não determinístico (§2.8) | nenhum — o teste de reprodutibilidade passava | os resultados são reproduzíveis |
+| 6 | Dois caminhos de código para o mesmo cálculo (§2.9) | duas tabelas discordando na quarta casa decimal | a ablação reproduz o experimento principal exatamente |
 
-Os cinco produziriam tabelas plausíveis. Nenhum se manifestou como erro, e quatro foram encontrados por
+Os seis produziriam tabelas plausíveis. Nenhum se manifestou como erro, e cinco foram encontrados por
 revisão adversarial do código, não pelas métricas — que em nenhum dos casos exibiram sinal de anomalia. O
 quinto é o mais instrutivo: havia um teste automatizado escrito exatamente para ele, chamado
 `test_generate_payment_records_reproducible`, e ele **passava**, porque comparava duas chamadas dentro de
 um mesmo processo. A contribuição metodológica não é "verifique vazamento": é que **a verificação precisa
 ser sistemática e adversarial, porque cada instrumento só enxerga o modo de falha para o qual foi
 construído** — e porque um teste pode medir uma propriedade mais fraca do que a que seu nome anuncia. O
-guarda anti-vazamento é útil e não teria detectado quatro dos cinco.
+guarda anti-vazamento é útil e não teria detectado cinco dos seis.
 
 **Ressalva de honestidade.** O artefato foi reduzido, não eliminado. Com cinco pagamentos por fornecedor,
 uma linha de treino contribui para a mediana do próprio fornecedor, de modo que seu desvio é encolhido em
@@ -983,7 +1017,7 @@ apresentação oral, antes que a banca as levante.
 | # | Limitação | Gravidade |
 | --- | --- | --- |
 | 24 | **A base continua sintética.** Todas as limitações de validade externa 9, 10, 11, 14, 15, 16 e 17 permanecem integralmente. O experimento demonstra que a tarefa *construída* é aprendível e que os algoritmos diferem *nela* — não que conciliação real seja aprendível. | Alta |
-| 25 | **As alíquotas de retenção são parâmetros, não afirmações normativas.** IRRF 1,5%, CSRF 4,65%, INSS 11% e o limite de R$ 5.000 estão em `config.yaml` e precisam de conferência contra a legislação vigente antes de qualquer afirmação jurídica no texto. | Alta |
+| 25 | **As alíquotas de retenção são parâmetros, não afirmações normativas — e o limite não está mais vigente.** Conferido: IRRF 1,5% sobre serviços profissionais (art. 714 do RIR/2018), CSRF 4,65% e INSS 11% (art. 31 da Lei nº 8.212/1991) continuam em vigor. O limite de R$ 5.000,00 para a CSRF, porém, reproduz a redação do art. 31 da Lei nº 10.833/2003 **anterior à Lei nº 13.137/2015**, que a revogou: desde 22/06/2015 a retenção incide independentemente do valor, dispensada apenas quando o DARF resultante fica em R$ 10,00 ou menos. O limite é mantido no gerador por criar a interação condicional entre valor e retenção que o experimento explora, e **não** por descrever a regra em vigor. | Alta |
 | 26 | **A dificuldade da tarefa é um parâmetro escolhido.** `hard_negative_rate: 0.30` determina quanto da base é resolvível apenas pela razão de valor. Um valor diferente moveria as três médias. O valor usado foi fixado antes de observar os resultados e não foi ajustado depois — mas isso é uma afirmação sobre o processo, não uma propriedade verificável do artefato. | Alta |
 | 27 | **Resíduo do artefato de escala em `desvio_prazo_fornecedor`.** Com cinco pagamentos por fornecedor, uma linha de treino contribui para a mediana do próprio fornecedor e tem o desvio encolhido em relação a uma linha de teste: na configuração de 7.500 registros, desvio-padrão de cerca de 13,8 no treino contra 18,5 no teste, com as linhas extremas em |z| ≈ 5. É o mesmo mecanismo de §4.6 em amplitude muito menor, mas não é zero. Uma mediana *leave-one-out* o eliminaria. | Média |
 | 28 | **A similaridade textual é acoplada à partição.** O `TfidfVectorizer` é reajustado a cada chamada de `build_features_v2`, de modo que o IDF de um registro depende de com quais outros ele foi processado — a mesma acoplagem transdutiva que o estudo critica, em escala menor. Como consequência, `similaridade_descricao` não é computável para um registro novo isolado em inferência. | Média |
