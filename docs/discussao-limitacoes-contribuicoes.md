@@ -5,11 +5,13 @@ Todos os números citados foram extraídos diretamente dos artefatos do reposit�
 (`data/results/*/metrics_summary.csv`, `data/results/ablation/ablation_summary.csv`,
 `data/results/comparison/*.csv`, matrizes de confusão, `data/processed/*.csv`) e do código-fonte.
 
-> **Aviso sobre as referências.** As obras citadas ao longo do texto são sugestões de ancoragem teórica.
-> Elas são reais e amplamente conhecidas nas respectivas áreas, mas **você deve conferir autoria, ano,
-> periódico, volume e páginas em uma base bibliográfica (Scopus, Web of Science, Google Scholar, Portal
-> de Periódicos CAPES) antes de incorporá-las à monografia**. Trechos marcados com `[VERIFICAR]` exigem
-> essa conferência. Não cite nenhuma obra que você não tenha lido pelo menos em resumo e conclusão.
+> **Nota sobre as referências.** As obras citadas foram conferidas contra registros bibliográficos
+> (Crossref e bases dos editores) na revisão final: autoria completa, ano, periódico ou evento, volume,
+> número e páginas. Duas correções resultaram dessa conferência e já estão aplicadas na monografia —
+> Cormier et al. (2025) tem oito autores, e não um, e o capítulo de França et al. (2021) integra
+> *Trends in Deep Learning Methodologies*, e não *Hybrid Computational Intelligence for Pattern
+> Analysis*. Duas obras citadas apenas neste documento de apoio, e ausentes da monografia, seguem
+> **sem conferência** e estão marcadas como tal no texto: o arcabouço do COSO e a NBC TA 530.
 
 ---
 
@@ -91,9 +93,7 @@ As demais cinco variáveis somam ≈13%, e `cnpj_match` tem importância exatame
 
 Este é o fenômeno que Kaufman, Rosset, Perlich e Stitelman descreveram como *leakage* — a introdução, no
 conjunto de variáveis preditoras, de informação que não estaria legitimamente disponível no momento da
-predição, ou que é derivada do próprio alvo `[VERIFICAR: Kaufman, S.; Rosset, S.; Perlich, C.;
-Stitelman, O. "Leakage in Data Mining: Formulation, Detection, and Avoidance". ACM Transactions on
-Knowledge Discovery from Data, v. 6, n. 4, 2012]`. Os autores destacam que o sintoma clássico do
+predição, ou que é derivada do próprio alvo `Kaufman et al. (2012)`. Os autores destacam que o sintoma clássico do
 vazamento é justamente o desempenho implausivelmente alto e estável — precisamente o padrão observado
 aqui (acurácia unitária com dp de validação cruzada nulo).
 
@@ -111,10 +111,7 @@ que poucas organizações dispõem de rótulos auditados independentemente.
 
 A literatura de aprendizado de máquina aplicado à contabilidade e auditoria vem alertando para a
 distância entre acurácia reportada e utilidade operacional
-`[VERIFICAR: Bao, Y.; Ke, B.; Li, B.; Yu, Y. J.; Zhang, J. "Detecting Accounting Fraud in Publicly
-Traded U.S. Firms Using a Machine Learning Approach". Journal of Accounting Research, v. 58, n. 1,
-2020]` e `[VERIFICAR: Appelbaum, D.; Kogan, A.; Vasarhelyi, M. A. "Big Data and Analytics in the Modern
-Audit Engagement: Research Needs". Auditing: A Journal of Practice & Theory, v. 36, n. 4, 2017]`. Este
+`Bao et al. (2020)` e `Appelbaum et al. (2017)`. Este
 trabalho oferece uma instância concreta, reprodutível e quantificada desse descolamento.
 
 ### 2.2 Por que SVM e Regressão Logística estacionam em ~0,91: uma explicação geométrica
@@ -169,10 +166,8 @@ apropriada, portanto, não é "use Random Forest para conciliação", e sim: **a
 entre os três algoritmos era, em sua totalidade, um artefato de pré-processamento.**
 
 A literatura clássica de comparação empírica de classificadores oferece o enquadramento adequado:
-o teorema *No Free Lunch* `[VERIFICAR: Wolpert, D. H. "The Lack of A Priori Distinctions Between Learning
-Algorithms". Neural Computation, v. 8, n. 7, 1996]` e o levantamento de Fernández-Delgado e colegas sobre
-121 conjuntos de dados `[VERIFICAR: Fernández-Delgado, M. et al. "Do we Need Hundreds of Classifiers to
-Solve Real World Classification Problems?". Journal of Machine Learning Research, v. 15, 2014]` sustentam
+o teorema *No Free Lunch* `Wolpert (1996)` e o levantamento de Fernández-Delgado e colegas sobre
+121 conjuntos de dados `Fernández-Delgado et al. (2014)` sustentam
 que o desempenho relativo de algoritmos é condicionado à representação dos dados, não intrínseco.
 
 ### 2.3 A assimetria dos erros e o custo em contexto de auditoria
@@ -199,11 +194,10 @@ Random Forest passa a cometer 245 falsos positivos contra zero falsos negativos 
 classes (69,8% positivos) e métrica de seleção simétrica.
 
 Este ponto conecta o trabalho diretamente à teoria de aprendizado sensível a custo
-`[VERIFICAR: Elkan, C. "The Foundations of Cost-Sensitive Learning". In: Proceedings of the 17th
-International Joint Conference on Artificial Intelligence (IJCAI), 2001]` e às estruturas normativas de
+`Elkan (2001)` e às estruturas normativas de
 controle interno, que tratam a detecção de exceções como objetivo de controle e não como métrica de
-eficiência `[VERIFICAR: COSO. Internal Control — Integrated Framework, 2013]` e
-`[VERIFICAR: NBC TA 530 — Amostragem em Auditoria, Conselho Federal de Contabilidade]`.
+eficiência `COSO (2013) [não conferido]` e
+`NBC TA 530 do CFC [não conferido]`.
 
 Recomendação derivada: **em conciliação, a métrica de seleção de modelo deve ser o recall da classe de
 exceção, sob restrição de precisão mínima aceitável — não F1-macro nem acurácia.** Um sistema que
@@ -212,9 +206,7 @@ operacionalmente superior a um que automatiza 91% silenciando 29% das exceções
 
 Observe-se também a discrepância entre ROC-AUC e F1-macro: o SVM no cenário `exact` atinge AUC de 0,9824
 com F1-macro de apenas 0,8892, e a Regressão Logística 0,9877 com o mesmo 0,8892. Com classes desbalanceadas, a curva ROC produz impressão otimista do
-desempenho, fenômeno documentado por `[VERIFICAR: Saito, T.; Rehmsmeier, M. "The Precision-Recall Plot
-Is More Informative than the ROC Plot When Evaluating Binary Classifiers on Imbalanced Datasets". PLoS
-ONE, v. 10, n. 3, 2015]`. A ablação fornece ilustração ainda mais didática: no cenário `fuzzy` sem
+desempenho, fenômeno documentado por `Saito e Rehmsmeier (2015)`. A ablação fornece ilustração ainda mais didática: no cenário `fuzzy` sem
 vazamento, o SVM alcança **acurácia de 0,8491 sem jamais predizer a classe "parcialmente conciliado"**
 (recall da classe 1 = 0,0000). Vale registrar essa observação como limitação metodológica do próprio
 conjunto de métricas adotado.
@@ -270,8 +262,7 @@ delimita com precisão o alcance do que foi demonstrado.
 
 Vale acrescentar que a importância por impureza da Random Forest, aqui utilizada, é reconhecidamente
 enviesada em favor de variáveis contínuas de alta cardinalidade
-`[VERIFICAR: Strobl, C.; Boulesteix, A.-L.; Zeileis, A.; Hothorn, T. "Bias in Random Forest Variable
-Importance Measures: Illustrations, Sources and a Solution". BMC Bioinformatics, v. 8, 2007]` — o que
+`Strobl et al. (2007)` — o que
 recomenda cautela adicional na leitura dos valores absolutos, ainda que a hierarquia observada seja
 robusta o bastante para sustentar o argumento.
 
@@ -279,10 +270,8 @@ robusta o bastante para sustentar o argumento.
 
 A tarefa aqui tratada é, formalmente, um problema de **pareamento de registros** (*record linkage*), campo
 com fundamentação teórica consolidada desde o modelo probabilístico de Fellegi e Sunter
-`[VERIFICAR: Fellegi, I. P.; Sunter, A. B. "A Theory for Record Linkage". Journal of the American
-Statistical Association, v. 64, n. 328, p. 1183-1210, 1969]`, sistematizado em obra de referência por
-Christen `[VERIFICAR: Christen, P. Data Matching: Concepts and Techniques for Record Linkage, Entity
-Resolution and Duplicate Detection. Springer, 2012]`.
+`Fellegi e Sunter (1969)`, sistematizado em obra de referência por
+Christen `Christen (2012)`.
 
 O confronto com essa literatura evidencia uma diferença estrutural relevante. No modelo de Fellegi-Sunter,
 o objeto de decisão é o **par candidato** (pagamento *i*, nota *j*), e o problema central é a geração de
@@ -561,8 +550,7 @@ metodológico explícito e mensurado.
   `delta_valor_pct` entre as variáveis. Seu propósito é isolar o efeito da escala, não produzir um modelo
   válido. O 1,0000 obtido ali continua sendo consequência da circularidade descrita em 2.1.
 - Não foram aplicados testes de significância estatística às diferenças entre configurações
-  `[VERIFICAR: Demšar, J. "Statistical Comparisons of Classifiers over Multiple Data Sets". JMLR, v. 7,
-  2006]`.
+  `Demšar (2006)`.
 - O experimento roda sob semente única (42), herdada de `config.yaml`.
 
 ---
@@ -744,13 +732,13 @@ A significância estatística não deve ser confundida com relevância prática.
 Forest e o SVM é de **1,44 pontos percentuais**: em uma carteira de 7.500 pagamentos com 30% de exceções,
 cerca de 32 divergências a mais. O teste a detecta porque a ordem se repete nas dez execuções, não porque
 a magnitude seja grande — que é exatamente a razão de o tamanho de efeito ser reportado ao lado do
-p-valor `[VERIFICAR: Demšar, J. JMLR, v. 7, 2006]`.
+p-valor `Demšar (2006)`.
 
 A leitura defensável é, portanto, mais matizada do que "a Random Forest vence": **os três algoritmos são
 operacionalmente próximos**, com a Regressão Logística cerca de 4,6 pontos atrás, e a escolha entre eles
 pode legitimamente recair sobre interpretabilidade e custo em vez de desempenho. Para um sistema que
 precisa justificar cada exceção a um auditor, os coeficientes da regressão logística podem valer mais que
-4,6 pontos de recall `[VERIFICAR: Rudin, C. Nature Machine Intelligence, v. 1, 2019]`.
+4,6 pontos de recall `Rudin (2019)`.
 
 ### 4.5 Estabilidade
 
@@ -1096,8 +1084,7 @@ treinamento com busca em grade, avaliação e ablação — com parametrização
 `config.yaml`, semente fixa, empacotamento Python e suíte de testes automatizados cobrindo os quatro
 módulos. Qualquer terceiro reproduz os resultados com dois comandos, e a reprodução dos valores originais
 sob bibliotecas mais recentes (§3.2) constitui evidência da robustez do pipeline. Isso atende aos
-critérios de pesquisa computacional reprodutível `[VERIFICAR: Peng, R. D. "Reproducible Research in
-Computational Science". Science, v. 334, n. 6060, 2011]` e é, por si, contribuição de engenharia de
+critérios de pesquisa computacional reprodutível `Peng (2011)` e é, por si, contribuição de engenharia de
 software — coerente com a natureza do MBA.
 
 **7.2 Gerador de dados sintéticos de conciliação fiscal brasileira.**
@@ -1106,8 +1093,7 @@ CNPJs válidos (dígitos verificadores calculados), códigos IBGE de municípios
 da LC 116/2003 e quatro modos de divergência parametrizáveis. Trata-se de recurso reutilizável para
 ensino, prototipagem e *benchmarking* em contexto fiscal brasileiro, onde a escassez de bases públicas é
 obstáculo reconhecido à pesquisa — o que dialoga com a literatura de dados sintéticos
-`[VERIFICAR: Patki, N.; Wedge, R.; Veeramachaneni, K. "The Synthetic Data Vault". In: IEEE International
-Conference on Data Science and Advanced Analytics (DSAA), 2016]`.
+`Patki et al. (2016)`.
 
 **7.3 Checklist de diagnóstico para projetos de conciliação automatizada.**
 Do estudo derivam verificações diretamente aplicáveis por equipes de engenharia e auditoria interna:
@@ -1147,9 +1133,7 @@ que os modelos conseguem detectar é apenas a ausência de nota fiscal, que é o
 relacional. O aprendizado supervisionado só se justifica onde a regra é desconhecida, instável ou
 intratável: ruído textual em razões sociais, pareamento N:M, priorização de exceções por risco. Essa
 delimitação evita investimento mal direcionado e reforça o argumento de que modelos interpretáveis devem
-ser preferidos em decisões de alto risco `[VERIFICAR: Rudin, C. "Stop Explaining Black Box Machine
-Learning Models for High Stakes Decisions and Use Interpretable Models Instead". Nature Machine
-Intelligence, v. 1, 2019]`.
+ser preferidos em decisões de alto risco `Rudin (2019)`.
 
 **7.5 O guarda anti-vazamento como artefato reutilizável.**
 `models/leak_guard.py` ajusta uma árvore de profundidade 1 sobre cada variável isoladamente e **falha o
@@ -1171,8 +1155,7 @@ por verificação automatizada.
 A separação entre simulação, ETL, modelagem e avaliação, com configuração externalizada e artefatos
 persistidos por cenário, constitui modelo transponível para implantações reais, mitigando o débito
 técnico característico de sistemas de aprendizado de máquina
-`[VERIFICAR: Sculley, D. et al. "Hidden Technical Debt in Machine Learning Systems". In: Advances in
-Neural Information Processing Systems (NeurIPS), 2015]`.
+`Sculley et al. (2015)`.
 
 ---
 
