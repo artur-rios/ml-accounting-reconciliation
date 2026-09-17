@@ -1,0 +1,4 @@
+algorithm_a,algorithm_b,median_diff,statistic,p_value,p_holm,significant
+logistic_regression,random_forest,-0.04555555555555557,0.0,0.001953125,0.005859375,True
+logistic_regression,svm,-0.030000000000000027,1.0,0.00390625,0.005859375,True
+random_forest,svm,0.014444444444444426,0.0,0.001953125,0.005859375,True

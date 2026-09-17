@@ -1,0 +1,7 @@
+algorithm_a,algorithm_b,median_diff,statistic,p_value,p_holm,significant,metric
+logistic_regression,random_forest,-0.020956837393988625,0.0,0.001953125,0.005859375,True,pr_auc_excecao
+logistic_regression,svm,-0.012482488972433481,2.0,0.005859375,0.005859375,True,pr_auc_excecao
+random_forest,svm,0.008820665789223692,0.0,0.001953125,0.005859375,True,pr_auc_excecao
+logistic_regression,random_forest,0.007592692814656188,10.0,0.083984375,0.251953125,False,precisao_excecao
+logistic_regression,svm,0.007779327428054039,21.0,0.556640625,0.556640625,False,precisao_excecao
+random_forest,svm,-0.0033452089401134755,16.0,0.275390625,0.55078125,False,precisao_excecao

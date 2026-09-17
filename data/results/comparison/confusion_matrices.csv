@@ -1,0 +1,4 @@
+algorithm,vp_excecao,fp_excecao,fn_excecao,vn_excecao,divergencias_silenciadas,revisoes_redundantes
+random_forest,3697,446,803,10054,803,446
+svm,3601,405,899,10095,899,405
+logistic_regression,3464,374,1036,10126,1036,374

@@ -1,0 +1,4 @@
+metric,n_seeds,n_algorithms,statistic,p_value,significant,rank_medio_logistic_regression,rank_medio_random_forest,rank_medio_svm
+recall_excecao,10,3,18.200000000000017,0.0001116658084901137,True,2.9,1.0,2.1
+pr_auc_excecao,10,3,18.200000000000017,0.0001116658084901137,True,2.9,1.0,2.1
+precisao_excecao,10,3,4.200000000000003,0.12245642825298172,False,1.6,2.5,1.9
