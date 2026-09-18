@@ -10,8 +10,9 @@ Todos os números citados foram extraídos diretamente dos artefatos do reposit�
 > número e páginas. Duas correções resultaram dessa conferência e já estão aplicadas na monografia —
 > Cormier et al. (2025) tem oito autores, e não um, e o capítulo de França et al. (2021) integra
 > *Trends in Deep Learning Methodologies*, e não *Hybrid Computational Intelligence for Pattern
-> Analysis*. Duas obras citadas apenas neste documento de apoio, e ausentes da monografia, seguem
-> **sem conferência** e estão marcadas como tal no texto: o arcabouço do COSO e a NBC TA 530.
+> Analysis*. As duas obras normativas citadas neste documento — o arcabouço de controle interno do
+> COSO (2013), publicado em 14 de maio de 2013, e a NBC TA 530, aprovada pela Resolução CFC nº 1.222, de
+> 27 de novembro de 2009 — também foram conferidas.
 
 ---
 
@@ -193,11 +194,19 @@ Random Forest passa a cometer 245 falsos positivos contra zero falsos negativos 
 (seção 3.4). A tendência a silenciar exceções não é acidental — decorre da combinação entre desbalanço de
 classes (69,8% positivos) e métrica de seleção simétrica.
 
-Este ponto conecta o trabalho diretamente à teoria de aprendizado sensível a custo
-`Elkan (2001)` e às estruturas normativas de
-controle interno, que tratam a detecção de exceções como objetivo de controle e não como métrica de
-eficiência `COSO (2013) [não conferido]` e
-`NBC TA 530 do CFC [não conferido]`.
+Este ponto conecta o trabalho diretamente à teoria de aprendizado sensível a custo (Elkan, 2001) e às
+estruturas normativas de controle interno, que tratam a detecção de exceções como objetivo de controle e
+não como métrica de eficiência (COSO, 2013).
+
+A ancoragem normativa mais precisa, porém, é brasileira. A NBC TA 530 — Amostragem em Auditoria, aprovada
+pela Resolução CFC nº 1.222/2009, define o risco de amostragem como a possibilidade de duas conclusões
+erradas e as **hierarquiza explicitamente**: concluir que os controles são mais eficazes do que são, ou
+que não há distorção relevante quando há, *afeta a eficácia da auditoria* e pode levar a uma opinião
+inadequada; a conclusão oposta afeta apenas a *eficiência*, por gerar trabalho adicional. É exatamente a
+assimetria deste trabalho, formulada pela norma profissional: a divergência silenciada é o erro de
+eficácia, a revisão redundante é o erro de eficiência. A recomendação de selecionar modelos pelo recall
+da exceção não é, portanto, uma preferência do autor — é a transposição, para a seleção de modelos, de
+uma ordenação de riscos que a norma de auditoria já estabelece.
 
 Recomendação derivada: **em conciliação, a métrica de seleção de modelo deve ser o recall da classe de
 exceção, sob restrição de precisão mínima aceitável — não F1-macro nem acurácia.** Um sistema que
@@ -1024,6 +1033,7 @@ apresentação oral, antes que a banca as levante.
 | 33 | **Viés de seleção na escolha do limiar** (§4.9). O limiar é o de maior recall entre milhares que atingem o piso na validação, o que seleciona sistematicamente pontos cuja precisão cruzou o piso por sorte. O piso de 0,90 vale na validação e é apenas aproximado no teste (0,893 para a floresta). `precision_margin` corrige, mas alterá-lo moveria todas as métricas publicadas. | Média |
 | 34 | **Os não-pares são o mesmo pagamento com evidência corrompida** (§4.10), e não um pagamento de outra contraparte. Os algoritmos discriminam evidência corrompida, não contraparte errada — que é a metade do problema de conciliação real eliminada junto com a geração de candidatos (limitação 10). | Alta |
 | 35 | **Dez sementes de um gerador não são dez conjuntos de dados** (§4.10). Os testes medem estabilidade do ordenamento sob reamostragem de um único processo gerador, não generalização entre regimes. A varredura de `hard_negative_rate` (§8, item 11) é o que converteria isso em evidência de generalização. | Média |
+| 36 | **Sem linha de base baseada em regras no experimento de comparação.** A hipótese do projeto de pesquisa afirma que o aprendizado de máquina superaria as abordagens baseadas em regras. O experimento principal mostrou que, com a regra conhecida, os modelos apenas a reproduzem; o de comparação, porém, confronta os algoritmos **entre si**, e nenhum deles com uma regra. A superioridade sobre a conciliação por regras permanece, portanto, **não testada** sob rotulagem independente. | Alta |
 
 > **Nota.** As limitações 4, 7, 12, 20, 21 e 31 foram resolvidas ao longo deste trabalho, e cada uma
 > indica o escopo de sua resolução. As demais permanecem, e as de gravidade **Alta** — 1, 3, 9, 10, 11,
@@ -1205,6 +1215,7 @@ demais permanecem em aberto, em ordem de retorno esperado:
     pagamento com dimensões corrompidas (§4.10). Sortear a nota candidata entre as notas em aberto de
     outros fornecedores aproximaria o desenho da conciliação real e daria conteúdo ao item 5 desta
     agenda.
+16. **Construir a linha de base por regras no experimento de comparação.** Uma regra explícita — retenção dentro de combinação legal, prazo dentro da norma do fornecedor, município coincidente, similaridade textual acima de limiar — avaliada pelo mesmo critério de recall sob piso de precisão responderia diretamente à hipótese do projeto, e é o experimento de maior retorno ainda em aberto.
 
 ---
 
@@ -1268,6 +1279,9 @@ quantifica, converte vulnerabilidade em demonstração de rigor.
 > margem acima do piso na validação; deixei-o desligado porque ligá-lo muda o ponto de operação e todas as
 > métricas publicadas. O que reporto, então, é o que a regra de fato entrega: piso garantido na validação,
 > aproximado no teste, com desvio da ordem de 0,007.
+
+**"Seu projeto previa que o aprendizado de máquina melhoraria a conciliação. Melhorou?"**
+> Em parte, e a parte que não se confirmou é a mais útil. Onde a regra de conciliação era conhecida, os modelos não a superaram — reproduziram-na, com mais custo e menos transparência que uma consulta estruturada. Onde a evidência era ambígua e sobreposta, automatizaram a triagem: detectaram cerca de quatro em cada cinco divergências mantendo o piso de precisão. Mas preciso ser exato quanto ao limite: a hipótese falava em superar abordagens baseadas em regras, e o experimento de comparação confrontou os algoritmos entre si, não com uma regra. Essa comparação não foi feita, e é o próximo experimento que eu faria.
 
 **"Qual é a utilidade prática, então?"**
 > Três resultados acionáveis. Primeiro: quando a regra de conciliação é conhecida, aprendizado de máquina
