@@ -1,6 +1,6 @@
 # Financial Reconciliation Automation with Machine Learning
 
-End of course project for the Software Engineering MBA at USP - ESALQ. Licensed under the [MIT License](LICENSE). Automates financial reconciliation using supervised machine learning by simulating two real-world data sources (supplier payment records in Excel and electronic service invoices / NFS-e in XML), running them through an ETL pipeline to produce labeled datasets, then training and evaluating three classifiers.
+End of course project for the Software Engineering MBA at USP - ESALQ. Licensed under the [Artur Rios Attribution License](LICENSE). Automates financial reconciliation using supervised machine learning by simulating two real-world data sources (supplier payment records in Excel and electronic service invoices / NFS-e in XML), running them through an ETL pipeline to produce labeled datasets, then training and evaluating three classifiers.
 
 ## Research Question
 
