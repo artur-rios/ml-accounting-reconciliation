@@ -18,6 +18,8 @@ The repository contains three experiments, run in this order. Reading them out o
 
 Results, discussion and limitations: [`docs/discussao-limitacoes-contribuicoes.md`](docs/discussao-limitacoes-contribuicoes.md).
 
+The monograph is available in Markdown in [Brazilian Portuguese](docs/monography/monografia.md) and in [English](docs/monography/monography.md); the original `.docx` and `.pdf` in [`docs/monography/`](docs/monography/) remain the reference.
+
 Terms used across the code, configuration and write-up — ablation, leakage, sentinel encoding, exception recall, the Brazilian tax withholdings, and others — are defined in English and Brazilian Portuguese, with references, in the [glossary](docs/glossary.md).
 
 ## Scenarios (experiments 1 and 2)
