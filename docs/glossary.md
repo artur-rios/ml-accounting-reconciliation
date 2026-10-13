@@ -8,11 +8,14 @@ Termos usados neste repositório — no código, no `config.yaml`, nos artefatos
 monografia — explicados em inglês e em português do Brasil. Cada verbete diz o que o termo significa em
 geral e o que significa *aqui*, com as referências ao final do documento.
 
-> **Note on references · Nota sobre as referências.** The works cited are real and standard in their
-> fields, but confirm the full bibliographic record in an indexed database before citing them in the
-> monograph, and format them per ABNT NBR 6023. · As obras citadas são reais e de referência em suas
-> áreas, mas confirme o registro bibliográfico completo em base indexada antes de citá-las na monografia,
-> e formate-as conforme a ABNT NBR 6023.
+> **Note on references · Nota sobre as referências.** Checked on 2026-10-13: articles and chapters
+> against their Crossref records or the publisher's page (JMLR, arXiv, AAAI, IJCAI), and legislation
+> against the consolidated text on planalto.gov.br. The page range of Newell (1975) could not be
+> confirmed and is omitted; the textbooks and the CFC, COSO and ABRASF documents were not re-checked. ·
+> Conferido em 13/10/2026: artigos e capítulos contra o registro no Crossref ou a página do editor (JMLR,
+> arXiv, AAAI, IJCAI), e a legislação contra o texto compilado no planalto.gov.br. O intervalo de páginas
+> de Newell (1975) não pôde ser confirmado e foi omitido; os livros-texto e os documentos do CFC, do COSO
+> e da ABRASF não foram reconferidos.
 
 ## Contents · Sumário
 
@@ -95,9 +98,11 @@ geral e o que significa *aqui*, com as referências ao final do documento.
 **EN.** An ablation study measures how much each component of a system contributes to its result by
 removing or replacing that component, one at a time, while holding everything else constant, and
 observing the change in performance. The term is borrowed from neuroscience, where ablation is the
-surgical removal of tissue to infer its function; Newell (1975) used it for removing knowledge sources
-from speech-understanding systems, and it is now a standard requirement for supporting claims in machine
-learning papers (Cohen & Howe, 1988; Meyes et al., 2019; Lipton & Steinhardt, 2019). The key property is
+surgical removal of tissue to infer its function. In AI it is credited to Allen Newell, who used it in a
+1974 tutorial on speech understanding systems, published as Newell (1975) (Cohen & Howe, 1988, p. 40).
+It is now common practice in machine learning: Meyes et al. (2019) apply it to neural networks, and
+Lipton and Steinhardt (2019) single out missing ablations as a reason papers fail to show where their
+empirical gains come from. The key property is
 *control*: if the data, split, seed, hyperparameter grid or cross-validation protocol also changed, the
 difference could not be attributed to the ablated component.
 
@@ -119,9 +124,11 @@ learnable signal.
 **PT-BR.** Um estudo de ablação mede quanto cada componente de um sistema contribui para o resultado,
 removendo ou substituindo esse componente, um de cada vez, com todo o resto mantido constante, e
 observando a variação de desempenho. O termo vem da neurociência, em que ablação é a remoção cirúrgica de
-tecido para inferir sua função; Newell (1975) o usou para a remoção de fontes de conhecimento em sistemas
-de reconhecimento de fala, e hoje ele é exigência comum para sustentar afirmações em artigos de
-aprendizado de máquina (Cohen & Howe, 1988; Meyes et al., 2019; Lipton & Steinhardt, 2019). A propriedade
+tecido para inferir sua função. Em inteligência artificial, é atribuído a Allen Newell, que o usou num
+tutorial de 1974 sobre sistemas de compreensão da fala, publicado como Newell (1975) (Cohen & Howe, 1988,
+p. 40). Hoje é prática comum em aprendizado de máquina: Meyes et al. (2019) o aplicam a redes neurais, e
+Lipton e Steinhardt (2019) apontam a falta de ablações como razão pela qual artigos não mostram de onde
+vêm seus ganhos empíricos. A propriedade
 essencial é o *controle*: se os dados, a partição, a semente, a grade de hiperparâmetros ou o protocolo de
 validação cruzada também mudassem, a diferença não poderia ser atribuída ao componente removido.
 
@@ -788,14 +795,19 @@ Finanças das Capitais) publica o modelo conceitual e o leiaute XML nacional que
 
 ### CNPJ · CNPJ
 
-**EN.** *Cadastro Nacional da Pessoa Jurídica*, the Brazilian federal company registration number (14
-digits, two check digits), validated in `utils/cnpj.py` and used as the join key between payments and
-invoices.
+**EN.** *Cadastro Nacional da Pessoa Jurídica*, the Brazilian federal company registration number: 14
+positions, the last two being check digits. It is generated and validated in `utils/cnpj.py` and used as
+the join key between payments and invoices. IN RFB 2.229/2024 introduced an alphanumeric format for the
+first twelve positions of new registrations from July 2026, with existing numbers remaining valid; the
+simulator generates and validates the numeric format only.
 
-**PT-BR.** Cadastro Nacional da Pessoa Jurídica, número de inscrição federal das empresas (14 dígitos, dois
-verificadores), validado em `utils/cnpj.py` e usado como chave de junção entre pagamentos e notas.
+**PT-BR.** Cadastro Nacional da Pessoa Jurídica, número de inscrição federal das empresas: 14 posições,
+das quais as duas últimas são dígitos verificadores. É gerado e validado em `utils/cnpj.py` e usado como
+chave de junção entre pagamentos e notas. A IN RFB 2.229/2024 introduziu um formato alfanumérico para as
+doze primeiras posições das novas inscrições a partir de julho de 2026, e os números existentes
+continuam válidos; o simulador gera e valida apenas o formato numérico.
 
-**References · Referências:** [IN RFB 2.119/2022](#ref-inrfb2119).
+**References · Referências:** [IN RFB 2.119/2022](#ref-inrfb2119); [IN RFB 2.229/2024](#ref-inrfb2229).
 
 ### ISS · ISS
 
@@ -826,16 +838,23 @@ combinação legal a diferença do pagamento reproduz.
 ### CSRF threshold · Limite da CSRF
 
 **EN.** In the simulator, CSRF only applies to invoices above `csrf_threshold_brl` (R$ 5,000.00), and the
-feature `acima_limite_csrf` lets the model learn that interaction. This follows the original wording of
-Lei 10.833/2003, art. 31, §3; since Lei 13.137/2015 the waiver is based on the withheld amount
-(≤ R$ 10.00) rather than the invoice value, so the parameter is a modeling simplification.
+feature `acima_limite_csrf` lets the model learn that interaction. That waiver was added to Lei
+10.833/2003, art. 31, §3, by Lei 10.925/2004, and **is no longer in force**: Lei 13.137/2015 rewrote §3 so
+that retention applies regardless of invoice value and is waived only when the amount withheld is
+R$ 10.00 or less. The threshold is kept because of the conditional interaction it creates, not because it
+describes current law — limitation 25 in the
+[discussion document](discussao-limitacoes-contribuicoes.md#54-limitações-específicas-do-experimento-de-comparação).
 
 **PT-BR.** No simulador, a CSRF só se aplica a notas acima de `csrf_threshold_brl` (R$ 5.000,00), e a
-variável `acima_limite_csrf` permite ao modelo aprender essa interação. A regra segue a redação original
-da Lei 10.833/2003, art. 31, §3º; desde a Lei 13.137/2015 a dispensa se baseia no valor retido
-(≤ R$ 10,00), e não no valor da nota, de modo que o parâmetro é uma simplificação de modelagem.
+variável `acima_limite_csrf` permite ao modelo aprender essa interação. Essa dispensa foi incluída no
+art. 31, §3º, da Lei 10.833/2003 pela Lei 10.925/2004 e **não está mais em vigor**: a Lei 13.137/2015 deu
+nova redação ao §3º, de modo que a retenção incide independentemente do valor da nota e só é dispensada
+quando o valor retido for de R$ 10,00 ou menos. O limite é mantido pela interação condicional que cria, e
+não por descrever a regra vigente — limitação 25 do
+[documento de discussão](discussao-limitacoes-contribuicoes.md#54-limitações-específicas-do-experimento-de-comparação).
 
-**References · Referências:** [Lei 10.833/2003](#ref-lei10833); [Lei 13.137/2015](#ref-lei13137).
+**References · Referências:** [Lei 10.833/2003](#ref-lei10833); [Lei 10.925/2004](#ref-lei10925);
+[Lei 13.137/2015](#ref-lei13137).
 
 ### Supplier payment term · Prazo de pagamento do fornecedor
 
@@ -866,32 +885,32 @@ mediana exista.
 
 **Methodology, leakage and evaluation · Metodologia, vazamento e avaliação**
 
-- <a id="ref-cawley2010"></a>CAWLEY, G. C.; TALBOT, N. L. C. On over-fitting in model selection and subsequent selection bias in performance evaluation. *Journal of Machine Learning Research*, v. 11, p. 2079–2107, 2010. Available at: <https://jmlr.org/papers/v11/cawley10a.html>.
-- <a id="ref-cohen1988"></a>COHEN, P. R.; HOWE, A. E. How evaluation guides AI research. *AI Magazine*, v. 9, n. 4, p. 35–43, 1988.
-- <a id="ref-demsar2006"></a>DEMŠAR, J. Statistical comparisons of classifiers over multiple data sets. *Journal of Machine Learning Research*, v. 7, p. 1–30, 2006. Available at: <https://jmlr.org/papers/v7/demsar06a.html>.
-- <a id="ref-elkan2001"></a>ELKAN, C. The foundations of cost-sensitive learning. In: INTERNATIONAL JOINT CONFERENCE ON ARTIFICIAL INTELLIGENCE (IJCAI), 17., 2001. *Proceedings* […]. p. 973–978.
+- <a id="ref-cawley2010"></a>CAWLEY, G. C.; TALBOT, N. L. C. On over-fitting in model selection and subsequent selection bias in performance evaluation. *Journal of Machine Learning Research*, v. 11, n. 70, p. 2079–2107, 2010. Available at: <https://jmlr.org/papers/v11/cawley10a.html>.
+- <a id="ref-cohen1988"></a>COHEN, P. R.; HOWE, A. E. How evaluation guides AI research: the message still counts more than the medium. *AI Magazine*, v. 9, n. 4, p. 35–43, 1988. DOI: 10.1609/aimag.v9i4.952.
+- <a id="ref-demsar2006"></a>DEMŠAR, J. Statistical comparisons of classifiers over multiple data sets. *Journal of Machine Learning Research*, v. 7, n. 1, p. 1–30, 2006. Available at: <https://jmlr.org/papers/v7/demsar06a.html>.
+- <a id="ref-elkan2001"></a>ELKAN, C. The foundations of cost-sensitive learning. In: INTERNATIONAL JOINT CONFERENCE ON ARTIFICIAL INTELLIGENCE (IJCAI), 17., 2001, Seattle. *Proceedings* […]. San Francisco: Morgan Kaufmann, 2001. p. 973–978.
 - <a id="ref-fawcett2006"></a>FAWCETT, T. An introduction to ROC analysis. *Pattern Recognition Letters*, v. 27, n. 8, p. 861–874, 2006. DOI: 10.1016/j.patrec.2005.10.010.
 - <a id="ref-hastie2009"></a>HASTIE, T.; TIBSHIRANI, R.; FRIEDMAN, J. *The Elements of Statistical Learning*. 2. ed. New York: Springer, 2009.
 - <a id="ref-kapoor2023"></a>KAPOOR, S.; NARAYANAN, A. Leakage and the reproducibility crisis in machine-learning-based science. *Patterns*, v. 4, n. 9, 100804, 2023. DOI: 10.1016/j.patter.2023.100804.
-- <a id="ref-kaufman2012"></a>KAUFMAN, S.; ROSSET, S.; PERLICH, C.; STITELMAN, O. Leakage in data mining: formulation, detection, and avoidance. *ACM Transactions on Knowledge Discovery from Data*, v. 6, n. 4, art. 15, 2012. DOI: 10.1145/2382577.2382579.
-- <a id="ref-kohavi1995"></a>KOHAVI, R. A study of cross-validation and bootstrap for accuracy estimation and model selection. In: INTERNATIONAL JOINT CONFERENCE ON ARTIFICIAL INTELLIGENCE (IJCAI), 14., 1995. *Proceedings* […]. p. 1137–1145.
-- <a id="ref-lipton2019"></a>LIPTON, Z. C.; STEINHARDT, J. Troubling trends in machine learning scholarship. *ACM Queue*, v. 17, n. 1, p. 45–77, 2019.
+- <a id="ref-kaufman2012"></a>KAUFMAN, S.; ROSSET, S.; PERLICH, C.; STITELMAN, O. Leakage in data mining: formulation, detection, and avoidance. *ACM Transactions on Knowledge Discovery from Data*, v. 6, n. 4, p. 1–21, 2012. DOI: 10.1145/2382577.2382579. An earlier three-author version appeared at ACM SIGKDD 2011, p. 556–563, DOI: 10.1145/2020408.2020496.
+- <a id="ref-kohavi1995"></a>KOHAVI, R. A study of cross-validation and bootstrap for accuracy estimation and model selection. In: INTERNATIONAL JOINT CONFERENCE ON ARTIFICIAL INTELLIGENCE (IJCAI), 14., 1995, Montréal. *Proceedings* […]. San Mateo: Morgan Kaufmann, 1995. p. 1137–1145.
+- <a id="ref-lipton2019"></a>LIPTON, Z. C.; STEINHARDT, J. Troubling trends in machine learning scholarship. *ACM Queue*, v. 17, n. 1, p. 45–77, 2019. DOI: 10.1145/3317287.3328534.
 - <a id="ref-little2019"></a>LITTLE, R. J. A.; RUBIN, D. B. *Statistical Analysis with Missing Data*. 3. ed. Hoboken: Wiley, 2019.
 - <a id="ref-meyes2019"></a>MEYES, R.; LU, M.; DE PUISEAU, C. W.; MEISEN, T. Ablation studies in artificial neural networks. *arXiv preprint*, arXiv:1901.08644, 2019. Available at: <https://arxiv.org/abs/1901.08644>.
-- <a id="ref-newell1975"></a>NEWELL, A. A tutorial on speech understanding systems. In: REDDY, D. R. (ed.). *Speech Recognition: Invited Papers Presented at the 1974 IEEE Symposium*. New York: Academic Press, 1975. p. 3–54.
-- <a id="ref-patki2016"></a>PATKI, N.; WEDGE, R.; VEERAMACHANENI, K. The Synthetic Data Vault. In: IEEE INTERNATIONAL CONFERENCE ON DATA SCIENCE AND ADVANCED ANALYTICS (DSAA), 2016. *Proceedings* […]. p. 399–410.
+- <a id="ref-newell1975"></a>NEWELL, A. A tutorial on speech understanding systems. In: REDDY, D. R. (ed.). *Speech Recognition: Invited Papers Presented at the 1974 IEEE Symposium*. New York: Academic Press, 1975.
+- <a id="ref-patki2016"></a>PATKI, N.; WEDGE, R.; VEERAMACHANENI, K. The Synthetic Data Vault. In: IEEE INTERNATIONAL CONFERENCE ON DATA SCIENCE AND ADVANCED ANALYTICS (DSAA), 2016, Montreal. *Proceedings* […]. IEEE, 2016. p. 399–410. DOI: 10.1109/DSAA.2016.49.
 - <a id="ref-peng2011"></a>PENG, R. D. Reproducible research in computational science. *Science*, v. 334, n. 6060, p. 1226–1227, 2011. DOI: 10.1126/science.1213847.
 - <a id="ref-saito2015"></a>SAITO, T.; REHMSMEIER, M. The precision-recall plot is more informative than the ROC plot when evaluating binary classifiers on imbalanced datasets. *PLoS ONE*, v. 10, n. 3, e0118432, 2015. DOI: 10.1371/journal.pone.0118432.
-- <a id="ref-thaler1988"></a>THALER, R. H. Anomalies: the winner's curse. *Journal of Economic Perspectives*, v. 2, n. 1, p. 191–202, 1988.
+- <a id="ref-thaler1988"></a>THALER, R. H. Anomalies: the winner's curse. *Journal of Economic Perspectives*, v. 2, n. 1, p. 191–202, 1988. DOI: 10.1257/jep.2.1.191.
 
 **Algorithms and text representation · Algoritmos e representação de texto**
 
 - <a id="ref-breiman2001"></a>BREIMAN, L. Random forests. *Machine Learning*, v. 45, n. 1, p. 5–32, 2001. DOI: 10.1023/A:1010933404324.
 - <a id="ref-cortes1995"></a>CORTES, C.; VAPNIK, V. Support-vector networks. *Machine Learning*, v. 20, n. 3, p. 273–297, 1995. DOI: 10.1007/BF00994018.
-- <a id="ref-holte1993"></a>HOLTE, R. C. Very simple classification rules perform well on most commonly used datasets. *Machine Learning*, v. 11, n. 1, p. 63–90, 1993.
+- <a id="ref-holte1993"></a>HOLTE, R. C. Very simple classification rules perform well on most commonly used datasets. *Machine Learning*, v. 11, n. 1, p. 63–90, 1993. DOI: 10.1023/A:1022631118932.
 - <a id="ref-hosmer2013"></a>HOSMER, D. W.; LEMESHOW, S.; STURDIVANT, R. X. *Applied Logistic Regression*. 3. ed. Hoboken: Wiley, 2013.
-- <a id="ref-iba1992"></a>IBA, W.; LANGLEY, P. Induction of one-level decision trees. In: INTERNATIONAL WORKSHOP ON MACHINE LEARNING, 9., 1992. *Proceedings* […]. San Mateo: Morgan Kaufmann, 1992. p. 233–240.
-- <a id="ref-king2001"></a>KING, G.; ZENG, L. Logistic regression in rare events data. *Political Analysis*, v. 9, n. 2, p. 137–163, 2001.
+- <a id="ref-iba1992"></a>IBA, W.; LANGLEY, P. Induction of one-level decision trees. In: SLEEMAN, D.; EDWARDS, P. (ed.). *Machine Learning Proceedings 1992*. San Mateo: Morgan Kaufmann, 1992. p. 233–240. DOI: 10.1016/B978-1-55860-247-2.50035-8.
+- <a id="ref-king2001"></a>KING, G.; ZENG, L. Logistic regression in rare events data. *Political Analysis*, v. 9, n. 2, p. 137–163, 2001. DOI: 10.1093/oxfordjournals.pan.a004868.
 - <a id="ref-manning2008"></a>MANNING, C. D.; RAGHAVAN, P.; SCHÜTZE, H. *Introduction to Information Retrieval*. Cambridge: Cambridge University Press, 2008.
 - <a id="ref-salton1988"></a>SALTON, G.; BUCKLEY, C. Term-weighting approaches in automatic text retrieval. *Information Processing & Management*, v. 24, n. 5, p. 513–523, 1988. DOI: 10.1016/0306-4573(88)90021-0.
 - <a id="ref-strobl2007"></a>STROBL, C.; BOULESTEIX, A.-L.; ZEILEIS, A.; HOTHORN, T. Bias in random forest variable importance measures: illustrations, sources and a solution. *BMC Bioinformatics*, v. 8, art. 25, 2007. DOI: 10.1186/1471-2105-8-25.
@@ -908,23 +927,25 @@ mediana exista.
 - <a id="ref-coso2013"></a>COMMITTEE OF SPONSORING ORGANIZATIONS OF THE TREADWAY COMMISSION (COSO). *Internal Control — Integrated Framework*. 2013.
 - <a id="ref-fellegi1969"></a>FELLEGI, I. P.; SUNTER, A. B. A theory for record linkage. *Journal of the American Statistical Association*, v. 64, n. 328, p. 1183–1210, 1969. DOI: 10.1080/01621459.1969.10501049.
 - <a id="ref-kimball2004"></a>KIMBALL, R.; CASERTA, J. *The Data Warehouse ETL Toolkit*. Indianapolis: Wiley, 2004.
-- <a id="ref-vasarhelyi2015"></a>VASARHELYI, M. A.; KOGAN, A.; TUTTLE, B. M. Big data in accounting: an overview. *Accounting Horizons*, v. 29, n. 2, p. 381–396, 2015.
+- <a id="ref-vasarhelyi2015"></a>VASARHELYI, M. A.; KOGAN, A.; TUTTLE, B. M. Big data in accounting: an overview. *Accounting Horizons*, v. 29, n. 2, p. 381–396, 2015. DOI: 10.2308/acch-51071.
 
 **Brazilian standards and legislation · Normas e legislação brasileiras**
 
 - <a id="ref-abrasf"></a>ASSOCIAÇÃO BRASILEIRA DAS SECRETARIAS DE FINANÇAS DAS CAPITAIS (ABRASF). *Nota Fiscal de Serviços Eletrônica (NFS-e): modelo conceitual*. Available at: <https://abrasf.org.br/biblioteca/arquivos-publicos/nfs-e>.
-- <a id="ref-lc116"></a>BRASIL. Lei Complementar nº 116, de 31 de julho de 2003. Dispõe sobre o Imposto Sobre Serviços de Qualquer Natureza. Available at: <https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp116.htm>.
+- <a id="ref-lc116"></a>BRASIL. Lei Complementar nº 116, de 31 de julho de 2003. Dispõe sobre o Imposto Sobre Serviços de Qualquer Natureza (art. 8º, alíquota máxima de 5%; art. 8º-A, incluído pela LC nº 157/2016, alíquota mínima de 2%). Available at: <https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp116.htm>.
 - <a id="ref-lei8212"></a>BRASIL. Lei nº 8.212, de 24 de julho de 1991 (art. 31 — retenção de 11% sobre serviços). Available at: <https://www.planalto.gov.br/ccivil_03/leis/l8212cons.htm>.
-- <a id="ref-lei10833"></a>BRASIL. Lei nº 10.833, de 29 de dezembro de 2003 (arts. 30 a 36 — retenção de CSLL, COFINS e PIS/Pasep). Available at: <https://www.planalto.gov.br/ccivil_03/leis/2003/l10.833.htm>.
-- <a id="ref-lei13137"></a>BRASIL. Lei nº 13.137, de 19 de junho de 2015. Available at: <https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2015/lei/l13137.htm>.
-- <a id="ref-rir2018"></a>BRASIL. Decreto nº 9.580, de 22 de novembro de 2018 — Regulamento do Imposto sobre a Renda (RIR/2018). Available at: <https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/decreto/d9580.htm>.
+- <a id="ref-lei10833"></a>BRASIL. Lei nº 10.833, de 29 de dezembro de 2003 (arts. 30 e 31 — retenção de CSLL, COFINS e PIS/Pasep à alíquota total de 4,65%). Available at: <https://www.planalto.gov.br/ccivil_03/leis/2003/l10.833.htm>.
+- <a id="ref-lei10925"></a>BRASIL. Lei nº 10.925, de 23 de julho de 2004 (inclui o art. 31, §3º, na Lei nº 10.833/2003 — dispensa de retenção até R$ 5.000,00). Available at: <https://www.planalto.gov.br/ccivil_03/_ato2004-2006/2004/lei/l10.925.htm>.
+- <a id="ref-lei13137"></a>BRASIL. Lei nº 13.137, de 19 de junho de 2015 (nova redação do art. 31, §3º, da Lei nº 10.833/2003). Available at: <https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2015/lei/l13137.htm>.
+- <a id="ref-rir2018"></a>BRASIL. Decreto nº 9.580, de 22 de novembro de 2018 — Regulamento do Imposto sobre a Renda (RIR/2018) (art. 714 — IRRF de 1,5% sobre serviços profissionais). Available at: <https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/decreto/d9580.htm>.
 - <a id="ref-inrfb2119"></a>BRASIL. Receita Federal do Brasil. Instrução Normativa RFB nº 2.119, de 6 de dezembro de 2022 — dispõe sobre o Cadastro Nacional da Pessoa Jurídica (CNPJ).
+- <a id="ref-inrfb2229"></a>BRASIL. Receita Federal do Brasil. Instrução Normativa RFB nº 2.229, de 15 de outubro de 2024 — altera a IN RFB nº 2.119/2022 e institui o CNPJ alfanumérico.
 - <a id="ref-nbcta500"></a>CONSELHO FEDERAL DE CONTABILIDADE (CFC). *NBC TA 500 — Evidência de Auditoria*.
 - <a id="ref-nbcta530"></a>CONSELHO FEDERAL DE CONTABILIDADE (CFC). *NBC TA 530 — Amostragem em Auditoria*. Aprovada pela Resolução CFC nº 1.222, de 27 de novembro de 2009.
 
 **Software documentation · Documentação de software**
 
-- <a id="ref-pedregosa2011"></a>PEDREGOSA, F. et al. Scikit-learn: machine learning in Python. *Journal of Machine Learning Research*, v. 12, p. 2825–2830, 2011.
+- <a id="ref-pedregosa2011"></a>PEDREGOSA, F. et al. Scikit-learn: machine learning in Python. *Journal of Machine Learning Research*, v. 12, n. 85, p. 2825–2830, 2011.
 - <a id="ref-sklearn-cv"></a>SCIKIT-LEARN. *Cross-validation: evaluating estimator performance*. Available at: <https://scikit-learn.org/stable/modules/cross_validation.html>.
 - <a id="ref-sklearn-grid"></a>SCIKIT-LEARN. *Tuning the hyper-parameters of an estimator*. Available at: <https://scikit-learn.org/stable/modules/grid_search.html>.
 - <a id="ref-sklearn-preprocessing"></a>SCIKIT-LEARN. *Preprocessing data*. Available at: <https://scikit-learn.org/stable/modules/preprocessing.html>.

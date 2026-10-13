@@ -13,7 +13,7 @@ The repository contains three experiments, run in this order. Reading them out o
 | # | Runner | What it establishes |
 | --- | --- | --- |
 | 1 | `run_pipeline.py` | The main pipeline. Random Forest reaches accuracy 1.0000 — because the label is a deterministic threshold over two of its own features. It cannot answer the research question. |
-| 2 | `run_ablation.py` | Quantifies that circularity, and shows the 9 p.p. gap between algorithms was entirely an artifact of sentinel encoding. |
+| 2 | `run_ablation.py` | Quantifies that circularity, and shows the 11–13 p.p. F1-macro gap between algorithms was entirely an artifact of sentinel encoding. |
 | 3 | `run_comparison.py` | The corrective experiment that does answer the question: the label comes from generator ground truth, a leak guard fails the run if any single feature separates the classes, and selection is by exception recall under a precision floor. |
 
 Results, discussion and limitations: [`docs/discussao-limitacoes-contribuicoes.md`](docs/discussao-limitacoes-contribuicoes.md).
