@@ -1,5 +1,11 @@
 # Financial Reconciliation Automation with Machine Learning
 
+> [!NOTE]
+> This is the real, open-source code of ml-accounting-reconciliation. Its home is Forgejo, at
+> https://git.techcraftsmen.net/artur-rios/ml-accounting-reconciliation; the copy on GitHub is a read-only mirror, for viewing only, and
+> its issues and pull requests are not followed. If you want to contribute, email me at
+> arturdev@duck.com.
+
 Final project (TCC) for the MBA in Software Engineering at USP/ESALQ. Licensed under the [Artur Rios Attribution License](LICENSE). Automates financial reconciliation using supervised machine learning by simulating two real-world data sources (supplier payment records in Excel and electronic service invoices / NFS-e in XML), running them through an ETL pipeline to produce labeled datasets, then training and evaluating three classifiers.
 
 ## Research Question
