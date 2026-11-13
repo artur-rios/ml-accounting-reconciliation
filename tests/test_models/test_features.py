@@ -1,5 +1,4 @@
 import datetime
-import numpy as np
 import pandas as pd
 import pytest
 from reconciliacao.models.features import build_features
