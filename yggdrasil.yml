@@ -1,0 +1,18 @@
+# What Jenkins checks for this repository, read by the pipeline of the yggdrasil installation that runs it (yggdrasil's
+# docs/catalog.md, "Repository pipeline file", has every field). It is data, never code: images (pinned by version and
+# digest, which Renovate keeps up to date), commands and globs. The commands are scripts under ci/ that run from the
+# repository's root, so you can run them on your own machine too. The repository is research code, the `reconciliacao`
+# package (pyproject.toml) with its experiments and notebooks: nothing is deployed or released from it. The image is
+# Python 3.14, which the README says produced the versioned results.
+#
+# Check it where the catalog is, in the yggdrasil checkout:
+#   python3 scripts/pipeline_config.py describe ml-accounting-reconciliation <this repository's checkout>
+
+checks:
+  lint: # ruff check over the sources, tests and notebooks, with the rules pyproject.toml selects, pinned in ci/lint.sh
+    image: python:3.14.10-bookworm@sha256:3fe825da0a80fa8e2cd79baadeb76b03c0ddf3d6cdbc8346778a0208b9d6038c
+    run: ci/lint.sh
+
+  build: # the sdist and wheel (python -m build), then the whole pytest suite against the installed wheel (under a minute)
+    image: python:3.14.10-bookworm@sha256:3fe825da0a80fa8e2cd79baadeb76b03c0ddf3d6cdbc8346778a0208b9d6038c
+    run: ci/build.sh
