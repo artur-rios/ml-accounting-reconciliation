@@ -1,5 +1,4 @@
 import pytest
-from pathlib import Path
 from reconciliacao.utils.config import load_config
 
 

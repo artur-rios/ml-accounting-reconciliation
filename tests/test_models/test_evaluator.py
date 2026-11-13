@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import pytest
-from pathlib import Path
 from sklearn.dummy import DummyClassifier
 from reconciliacao.models.evaluator import evaluate_all
 

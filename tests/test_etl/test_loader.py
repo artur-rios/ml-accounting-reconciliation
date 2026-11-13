@@ -1,6 +1,4 @@
-import datetime
 import pytest
-import pandas as pd
 from reconciliacao.simulation.excel_generator import generate_payment_records, write_excel
 from reconciliacao.simulation.xml_generator import generate_nfse, write_xml
 from reconciliacao.etl.loader import load_pagamentos, load_nfse

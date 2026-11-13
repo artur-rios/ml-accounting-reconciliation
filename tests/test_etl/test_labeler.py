@@ -1,5 +1,4 @@
 import pandas as pd
-import pytest
 
 from reconciliacao.etl.labeler import label_records
 
