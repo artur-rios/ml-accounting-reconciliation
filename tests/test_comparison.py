@@ -1,3 +1,4 @@
+import copy
 import math
 
 import numpy as np
@@ -12,10 +13,11 @@ from reconciliacao.etl.truth_labeler import label_from_truth
 from reconciliacao.models.comparison_stats import paired_comparisons
 from reconciliacao.models.features_v2 import build_features_v2, fit_supplier_terms
 from reconciliacao.simulation.truth_generator import generate_comparison_dataset
+from tests.conftest import COMPARISON_CONFIG
 
 
 @pytest.mark.integration
-def test_end_to_end_produces_the_decision_artifacts(tmp_path, sample_config, comparison_config):
+def test_given_a_small_config_when_the_comparison_runs_end_to_end_then_every_decision_artifact_is_written(tmp_path, sample_config, comparison_config):
     cfg = dict(sample_config)
     comparison_config["n_records"] = 400
     comparison_config["cv_folds"] = 2
@@ -40,7 +42,7 @@ def test_end_to_end_produces_the_decision_artifacts(tmp_path, sample_config, com
 
 
 @pytest.mark.integration
-def test_threshold_is_chosen_on_validation_not_test(tmp_path, sample_config, comparison_config):
+def test_given_a_comparison_run_when_thresholds_are_chosen_then_validation_precision_meets_the_floor(tmp_path, sample_config, comparison_config, small_grids):
     """The reported test precision may fall below the floor; the validation one may not."""
     cfg = dict(sample_config)
     comparison_config["n_records"] = 400
@@ -67,7 +69,7 @@ def _stub_fit_algorithms(X_train, y_train, cfg, seed):
     }
 
 
-def test_run_seed_pins_partitions_supplier_terms_and_no_threshold_branch(
+def test_given_stubbed_models_when_a_seed_runs_then_partitions_supplier_terms_and_the_no_threshold_branch_hold(
     monkeypatch, sample_config, comparison_config
 ):
     """Direct test of run_seed (not the slow end-to-end run), pinning three
@@ -214,7 +216,7 @@ def _make_stub_fit_algorithms(classes):
     return _stub
 
 
-def test_exception_proba_is_read_via_classes_not_column_position(monkeypatch, sample_config, comparison_config):
+def test_given_reversed_class_order_when_a_seed_runs_then_the_exception_probability_is_read_via_classes(monkeypatch, sample_config, comparison_config):
     """Regression test for the [:, 0] positional bug: predict_proba's column
     order must be resolved through classes_, since it is only [0, 1] because
     integer labels happen to sort that way."""
@@ -234,9 +236,16 @@ def test_exception_proba_is_read_via_classes_not_column_position(monkeypatch, sa
         assert forward[column].to_numpy() == pytest.approx(reversed_[column].to_numpy(), abs=1e-9), column
 
 
+@pytest.fixture(scope="module")
+def built_features():
+    """The real pipeline from raw generation through build_features_v2, run
+    once for the module (it is deterministic, and the tests only read it)."""
+    return _built_features(copy.deepcopy(COMPARISON_CONFIG))
+
+
 def _built_features(comparison_config, seed=42):
     """Run the real pipeline from raw generation through build_features_v2,
-    exactly as run_seed does, and return (X_train, X_test, pairs, test_df)."""
+    exactly as run_seed does, and return (X_train, X_test, train_df, test_df)."""
     df_payments, df_invoices, df_truth = generate_comparison_dataset(comparison_config, seed)
     pairs = label_from_truth(df_payments, df_invoices, df_truth)
 
@@ -248,33 +257,33 @@ def _built_features(comparison_config, seed=42):
     return X_train, X_test, train_df, test_df
 
 
-def test_desvio_prazo_fornecedor_has_variance_on_train(comparison_config):
+def test_given_built_features_when_inspected_then_desvio_prazo_fornecedor_varies_on_train(built_features):
     """Regression test for the defect: one payment per supplier collapsed
     the per-supplier median onto each row's own value, zeroing
     desvio_prazo_fornecedor on every training row."""
-    X_train, _X_test, _train_df, _test_df = _built_features(comparison_config)
+    X_train, _X_test, _train_df, _test_df = built_features
     assert X_train["desvio_prazo_fornecedor"].nunique() > 1
 
 
-def test_no_feature_column_is_constant_on_train(comparison_config):
+def test_given_built_features_when_inspected_then_no_column_is_constant_on_train(built_features):
     """Generalises the above across every column -- the test whose absence
     let the defect through, and the one meant to catch the next one."""
-    X_train, _X_test, _train_df, _test_df = _built_features(comparison_config)
+    X_train, _X_test, _train_df, _test_df = built_features
     constant_columns = [c for c in X_train.columns if X_train[c].nunique() <= 1]
     assert constant_columns == []
 
 
-def test_some_test_suppliers_are_also_present_in_train(comparison_config):
+def test_given_the_partitions_when_compared_then_some_test_suppliers_also_appear_in_train(built_features):
     """With several invoices per supplier, a supplier can land in both the
     train and test partitions, so the fitted median genuinely transfers
     instead of every test row falling back to the global median."""
-    _X_train, _X_test, train_df, test_df = _built_features(comparison_config)
+    _X_train, _X_test, train_df, test_df = built_features
     train_suppliers = set(train_df["cnpj_fornecedor"])
     test_suppliers = set(test_df["cnpj_fornecedor"])
     assert len(train_suppliers & test_suppliers) > 0
 
 
-def test_train_and_test_scales_are_comparable(comparison_config):
+def test_given_train_scaling_when_applied_to_test_then_no_column_lands_far_in_the_tail(built_features):
     """The assertion whose absence let the desvio_prazo_fornecedor defect
     through, and the half of the recommendation that was missing.
 
@@ -292,7 +301,7 @@ def test_train_and_test_scales_are_comparable(comparison_config):
     tail. Five deviations is deliberately loose -- the defect put 83.75% of
     rows beyond it, with a maximum of 90.
     """
-    X_train, X_test, _train_df, _test_df = _built_features(comparison_config)
+    X_train, X_test, _train_df, _test_df = built_features
 
     media = X_train.mean()
     desvio = X_train.std(ddof=0)
@@ -310,7 +319,7 @@ def test_train_and_test_scales_are_comparable(comparison_config):
     )
 
 
-def test_razao_valor_and_retencao_are_the_known_exact_redundancy(comparison_config):
+def test_given_built_features_when_correlated_then_razao_valor_and_retencao_are_the_known_redundancy(built_features):
     """Pins the one documented collinearity so it stays documented.
 
     retencao_implicita_pct is (1 - razao_valor) * 100 by construction. The
@@ -319,7 +328,7 @@ def test_razao_valor_and_retencao_are_the_known_exact_redundancy(comparison_conf
     if a future change made one of them mean something else while the write-up
     still described them as redundant.
     """
-    X_train, _X_test, _train_df, _test_df = _built_features(comparison_config)
+    X_train, _X_test, _train_df, _test_df = built_features
 
     reconstruida = (1.0 - X_train["razao_valor"]) * 100.0
     assert reconstruida.to_numpy() == pytest.approx(
@@ -330,11 +339,11 @@ def test_razao_valor_and_retencao_are_the_known_exact_redundancy(comparison_conf
     assert correlacao == pytest.approx(-1.0, abs=1e-12)
 
 
-def test_no_other_feature_pair_is_perfectly_collinear(comparison_config):
+def test_given_built_features_when_correlated_then_no_other_pair_is_perfectly_collinear(built_features):
     """Generalises the above: exactly one perfectly collinear pair is known
     and declared. A second one appearing would mean the evidence matrix has
     silently lost another direction, which is the failure this catches."""
-    X_train, _X_test, _train_df, _test_df = _built_features(comparison_config)
+    X_train, _X_test, _train_df, _test_df = built_features
 
     conhecidos = {frozenset({"razao_valor", "retencao_implicita_pct"})}
     correlacoes = X_train.corr().abs()

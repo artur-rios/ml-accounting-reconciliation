@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.calibration import CalibratedClassifierCV
+
 from reconciliacao.models.trainer import get_pipelines, train_all
 
 
@@ -35,33 +37,72 @@ def mini_config():
     }
 
 
-def test_get_pipelines_returns_three_algorithms(mini_config):
+@pytest.fixture
+def trained(small_dataset, mini_config, tmp_path, small_grids):
+    X, y = small_dataset
+    return train_all(X, y, mini_config, tmp_path / "models"), tmp_path / "models"
+
+
+def test_given_a_config_when_pipelines_are_built_then_there_are_three_algorithms(mini_config):
     pipelines = get_pipelines(mini_config)
     assert set(pipelines.keys()) == {"random_forest", "svm", "logistic_regression"}
 
 
-def test_train_all_saves_model_files(small_dataset, mini_config, tmp_path):
-    X, y = small_dataset
-    train_all(X, y, mini_config, tmp_path / "models")
-    assert (tmp_path / "models" / "random_forest.joblib").exists()
-    assert (tmp_path / "models" / "svm.joblib").exists()
-    assert (tmp_path / "models" / "logistic_regression.joblib").exists()
+def test_given_a_config_when_pipelines_are_built_then_each_carries_the_published_search_grid(mini_config):
+    """The grids other tests shrink (conftest.SMALL_GRIDS) are pinned here."""
+    grids = {name: grid for name, (_estimator, grid) in get_pipelines(mini_config).items()}
+    assert grids == {
+        "random_forest": {"clf__n_estimators": [100, 200], "clf__max_depth": [None, 10]},
+        "svm": {"clf__estimator__C": [0.1, 1.0, 10.0]},
+        "logistic_regression": {"clf__C": [0.01, 0.1, 1.0, 10.0]},
+    }
 
 
-def test_train_all_returns_results_dict(small_dataset, mini_config, tmp_path):
-    X, y = small_dataset
-    results = train_all(X, y, mini_config, tmp_path / "models")
+def test_given_a_config_when_pipelines_are_built_then_its_settings_and_seed_reach_the_estimators(mini_config):
+    pipelines = {name: estimator for name, (estimator, _grid) in get_pipelines(mini_config).items()}
+    forest = pipelines["random_forest"].named_steps["clf"]
+    assert forest.n_estimators == 10
+    assert forest.class_weight == "balanced_subsample"
+    assert forest.random_state == 42
+
+    svm = pipelines["svm"].named_steps["clf"]
+    assert isinstance(svm, CalibratedClassifierCV)
+    assert svm.estimator.kernel == "rbf"
+    assert svm.estimator.random_state == 42
+    assert list(pipelines["svm"].named_steps) == ["scaler", "clf"]
+
+    logistic = pipelines["logistic_regression"].named_steps["clf"]
+    assert logistic.class_weight == "balanced"
+    assert logistic.max_iter == 1000
+
+
+def test_given_a_dataset_when_trained_then_each_model_is_saved(trained):
+    _results, models_dir = trained
+    for name in ("random_forest", "svm", "logistic_regression"):
+        assert (models_dir / f"{name}.joblib").exists()
+
+
+def test_given_a_dataset_when_trained_then_the_results_carry_the_estimator_test_split_and_cv_scores(
+        trained, small_dataset, mini_config):
+    results, _models_dir = trained
+    X, _y = small_dataset
     assert set(results.keys()) == {"random_forest", "svm", "logistic_regression"}
     for r in results.values():
-        assert "estimator" in r
-        assert "X_test" in r
-        assert "y_test" in r
-        assert "cv_score_mean" in r
+        assert len(r["X_test"]) == round(len(X) * mini_config["models"]["test_size"])
+        assert r["y_test"].index.equals(r["X_test"].index)
+        assert 0.0 <= r["cv_score_mean"] <= 1.0
+        assert r["cv_score_std"] >= 0.0
 
 
-def test_train_all_estimator_can_predict(small_dataset, mini_config, tmp_path):
-    X, y = small_dataset
-    results = train_all(X, y, mini_config, tmp_path / "models")
+def test_given_a_dataset_when_trained_then_the_split_is_stratified(trained):
+    results, _models_dir = trained
+    counts = results["svm"]["y_test"].value_counts()
+    assert sorted(counts.index) == [0, 1, 2]
+    assert counts.max() - counts.min() <= 1
+
+
+def test_given_a_trained_model_when_it_predicts_then_there_is_one_prediction_per_test_row(trained):
+    results, _models_dir = trained
     for r in results.values():
         preds = r["estimator"].predict(r["X_test"])
         assert len(preds) == len(r["y_test"])

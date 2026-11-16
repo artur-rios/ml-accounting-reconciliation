@@ -1,13 +1,24 @@
-import subprocess
+import runpy
 import sys
 from pathlib import Path
+
+import pandas as pd
 import pytest
+import yaml
+
+SCRIPT = Path(__file__).parent.parent / "run_pipeline.py"
 
 
 @pytest.mark.integration
-def test_pipeline_exact_scenario_runs_end_to_end(tmp_path, monkeypatch):
-    """Smoke test: run the full pipeline on a tiny dataset."""
-    import yaml
+@pytest.mark.parametrize("scenario, n_classes", [("exact", 2), ("fuzzy", 3)])
+def test_given_a_tiny_config_when_the_pipeline_script_runs_then_every_artifact_is_written(
+        tmp_path, monkeypatch, small_grids, scenario, n_classes):
+    """Smoke test: run_pipeline.py end to end on a tiny dataset.
+
+    The script runs in this process (runpy, as `python run_pipeline.py` would)
+    so the one-point grids from conftest apply: the point is the wiring from
+    simulation to metrics, not a real hyperparameter search.
+    """
     cfg = {
         "simulation": {"n_records": 80, "conciliation_rate": 0.70, "random_seed": 42},
         "scenarios": {
@@ -23,13 +34,19 @@ def test_pipeline_exact_scenario_runs_end_to_end(tmp_path, monkeypatch):
             "test_size": 0.20,
         },
     }
-    cfg_file = tmp_path / "config.yaml"
-    cfg_file.write_text(yaml.dump(cfg))
+    (tmp_path / "config.yaml").write_text(yaml.dump(cfg), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT), "--scenario", scenario])
 
-    result = subprocess.run(
-        [sys.executable, str(Path(__file__).parent.parent / "run_pipeline.py"), "--scenario", "exact"],
-        capture_output=True, text=True, timeout=120,
-    )
-    assert result.returncode == 0, result.stderr
-    assert (tmp_path / "data" / "results" / "exact" / "metrics_summary.csv").exists()
+    runpy.run_path(str(SCRIPT), run_name="__main__")
+
+    results = tmp_path / "data" / "results" / scenario
+    metrics = pd.read_csv(results / "metrics_summary.csv", index_col="algorithm")
+    assert set(metrics.index) == {"random_forest", "svm", "logistic_regression"}
+    for name in ("random_forest", "svm", "logistic_regression"):
+        assert (results / "models" / f"{name}.joblib").exists()
+        assert (results / f"confusion_matrix_{name}.png").exists()
+    assert (results / "roc_curve.png").exists() is (n_classes == 2)
+    assert (tmp_path / "data" / "raw" / "pagamentos.xlsx").exists()
+    assert (tmp_path / "data" / "raw" / "nfse.xml").exists()
+    assert (tmp_path / "data" / "processed" / f"{scenario}_reconciliado.csv").exists()
