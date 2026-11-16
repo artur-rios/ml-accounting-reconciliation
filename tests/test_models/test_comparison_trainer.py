@@ -24,13 +24,13 @@ def _xy(n=120, seed=0):
     return X, y
 
 
-def test_fits_all_three_algorithms(tiny_cfg):
+def test_given_a_training_partition_when_fitted_then_all_three_algorithms_are_returned(tiny_cfg, small_grids):
     X, y = _xy()
     models = fit_algorithms(X, y, tiny_cfg, seed=42)
     assert set(models) == {"random_forest", "svm", "logistic_regression"}
 
 
-def test_every_estimator_can_produce_probabilities(tiny_cfg):
+def test_given_fitted_algorithms_when_asked_for_probabilities_then_each_returns_a_distribution(tiny_cfg, small_grids):
     X, y = _xy()
     models = fit_algorithms(X, y, tiny_cfg, seed=42)
     for name, model in models.items():
@@ -39,14 +39,15 @@ def test_every_estimator_can_produce_probabilities(tiny_cfg):
         assert np.allclose(proba.sum(axis=1), 1.0), name
 
 
-def test_seed_is_threaded_through_to_the_estimators(tiny_cfg):
+def test_given_the_same_seed_when_fitted_twice_then_the_forests_agree(tiny_cfg, small_grids):
     X, y = _xy()
     a = fit_algorithms(X, y, tiny_cfg, seed=1)["random_forest"]
     b = fit_algorithms(X, y, tiny_cfg, seed=1)["random_forest"]
     assert np.array_equal(a.predict(X), b.predict(X))
+    assert a.named_steps["clf"].random_state == 1
 
 
-def test_does_not_mutate_the_caller_cfg(tiny_cfg):
+def test_given_a_config_when_fitted_then_the_callers_config_is_unchanged(tiny_cfg, small_grids):
     import copy
 
     X, y = _xy()
@@ -69,12 +70,12 @@ class _StubClassifier(ClassifierMixin, BaseEstimator):
         return self.proba
 
 
-def test_resolve_scoring_rejects_unknown_names():
+def test_given_an_unknown_scoring_name_when_resolved_then_it_is_refused():
     with pytest.raises(ValueError):
         _resolve_scoring("average_precision")  # the wrong-class sklearn scorer name
 
 
-def test_scorer_targets_the_exception_class_not_the_genuine_pair():
+def test_given_two_rankings_when_scored_then_the_exception_class_is_the_one_measured():
     """A model that ranks exceptions (label 0) well must outscore one that
     ranks genuine pairs (label 1) well instead -- proving the configured
     scorer evaluates the exception column, not sklearn's default positive
@@ -96,7 +97,7 @@ def test_scorer_targets_the_exception_class_not_the_genuine_pair():
     assert scoring(good, None, y) > scoring(bad, None, y)
 
 
-def test_scorer_agrees_with_manual_pos_label_zero_computation(tiny_cfg):
+def test_given_fitted_models_when_scored_then_the_scorer_matches_a_manual_label_zero_computation(tiny_cfg, small_grids):
     """Empirical verification (per the task brief): the configured scorer's
     output must match average_precision_score computed by hand on column 0
     of predict_proba."""

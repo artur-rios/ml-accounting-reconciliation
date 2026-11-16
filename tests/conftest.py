@@ -7,9 +7,11 @@ import matplotlib
 # headless test run.
 matplotlib.use("Agg")
 
-import pytest
-import pandas as pd
+import copy
 import datetime
+
+import pandas as pd
+import pytest
 
 
 @pytest.fixture
@@ -76,28 +78,73 @@ def sample_nfse_clean():
     })
 
 
+#: Experiment 3 on a small configuration: 400 records, two seeds, two folds.
+COMPARISON_CONFIG = {
+    "n_seeds": 2,
+    "n_records": 400,
+    "match_rate": 0.70,
+    "payments_per_supplier": 5,
+    "hard_negative_rate": 0.30,
+    "atypical_term_rate": 0.10,
+    "term_shift_range": [-30, 60],
+    "atypical_description_rate": 0.12,
+    "same_municipality_rate": 0.85,
+    "payment_terms_days": [0, 15, 30, 45, 60],
+    "csrf_threshold_brl": 5000.0,
+    "invoice_value_range_brl": [500.0, 50000.0],
+    "iss_rate_range_pct": [2.0, 5.0],
+    "retention_rates": {"irrf": 1.50, "csrf": 4.65, "inss": 11.00},
+    "retention_tolerance_pp": 0.05,
+    "split": {"train": 0.60, "val": 0.20, "test": 0.20},
+    "min_precision": 0.90,
+    "precision_margin": 0.0,
+    "cv_folds": 2,
+    "scoring": "average_precision_excecao",
+    "leak_guard_max_stump_accuracy": 0.95,
+}
+
+
 @pytest.fixture
 def comparison_config():
-    return {
-        "n_seeds": 2,
-        "n_records": 400,
-        "match_rate": 0.70,
-        "payments_per_supplier": 5,
-        "hard_negative_rate": 0.30,
-        "atypical_term_rate": 0.10,
-        "term_shift_range": [-30, 60],
-        "atypical_description_rate": 0.12,
-        "same_municipality_rate": 0.85,
-        "payment_terms_days": [0, 15, 30, 45, 60],
-        "csrf_threshold_brl": 5000.0,
-        "invoice_value_range_brl": [500.0, 50000.0],
-        "iss_rate_range_pct": [2.0, 5.0],
-        "retention_rates": {"irrf": 1.50, "csrf": 4.65, "inss": 11.00},
-        "retention_tolerance_pp": 0.05,
-        "split": {"train": 0.60, "val": 0.20, "test": 0.20},
-        "min_precision": 0.90,
-        "precision_margin": 0.0,
-        "cv_folds": 2,
-        "scoring": "average_precision_excecao",
-        "leak_guard_max_stump_accuracy": 0.95,
-    }
+    """A fresh copy per test: several tests adjust it."""
+    return copy.deepcopy(COMPARISON_CONFIG)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def joblib_on_one_cpu():
+    """Keep GridSearchCV's workers to one process for the whole run.
+
+    The trainers search with n_jobs=-1, which joblib turns into one worker
+    process per core, each importing pandas and scikit-learn: on a 32-core
+    machine the suite peaked above 10 GB and was killed for it. The test
+    datasets are tiny, so the workers bought no speed, only memory. The
+    variable is inherited by any subprocess a test starts.
+    """
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("LOKY_MAX_CPU_COUNT", "1")
+        yield
+
+
+#: One point of each production grid. The grids themselves are pinned by
+#: test_trainer; the tests that only need *a* fitted model use these, so they
+#: do not pay for 200-tree forests and calibrated SVMs on 60 rows.
+SMALL_GRIDS = {
+    "random_forest": {"clf__n_estimators": [10], "clf__max_depth": [None]},
+    "svm": {"clf__estimator__C": [1.0]},
+    "logistic_regression": {"clf__C": [1.0]},
+}
+
+
+@pytest.fixture
+def small_grids(monkeypatch):
+    """Search a one-point grid per algorithm instead of the production one."""
+    from reconciliacao.models import comparison_trainer, trainer
+
+    real = trainer.get_pipelines
+
+    def small(cfg):
+        return {name: (estimator, SMALL_GRIDS[name]) for name, (estimator, _grid) in real(cfg).items()}
+
+    monkeypatch.setattr(trainer, "get_pipelines", small)
+    monkeypatch.setattr(comparison_trainer, "get_pipelines", small)
+    return SMALL_GRIDS

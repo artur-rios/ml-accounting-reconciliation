@@ -5,7 +5,7 @@ import pytest
 from reconciliacao.models.leak_guard import LeakDetected, assert_no_leak, stump_accuracies
 
 
-def test_detects_a_deliberately_circular_feature():
+def test_given_a_circular_feature_when_guarded_then_the_leak_is_detected():
     rng = np.random.default_rng(0)
     y = pd.Series(rng.integers(0, 2, size=300))
     X = pd.DataFrame({
@@ -17,7 +17,7 @@ def test_detects_a_deliberately_circular_feature():
     assert "copia_do_rotulo" in str(exc.value)
 
 
-def test_passes_when_no_single_feature_separates():
+def test_given_no_separating_feature_when_guarded_then_it_passes():
     rng = np.random.default_rng(0)
     y = pd.Series(rng.integers(0, 2, size=300))
     X = pd.DataFrame({
@@ -28,7 +28,7 @@ def test_passes_when_no_single_feature_separates():
     assert (report < 0.95).all()
 
 
-def test_report_covers_every_feature():
+def test_given_features_when_guarded_then_the_report_covers_each_one():
     rng = np.random.default_rng(0)
     y = pd.Series(rng.integers(0, 2, size=200))
     X = pd.DataFrame({"a": rng.normal(size=200), "b": rng.normal(size=200)})
@@ -36,7 +36,7 @@ def test_report_covers_every_feature():
     assert set(report.index) == {"a", "b"}
 
 
-def test_error_names_every_offending_feature():
+def test_given_several_leaking_features_when_guarded_then_the_error_names_each():
     rng = np.random.default_rng(0)
     y = pd.Series(rng.integers(0, 2, size=300))
     X = pd.DataFrame({
@@ -50,7 +50,7 @@ def test_error_names_every_offending_feature():
     assert "copia_1" in mensagem and "copia_2" in mensagem and "ruido" not in mensagem
 
 
-def test_raises_on_degenerate_labels():
+def test_given_a_class_smaller_than_the_folds_when_guarded_then_it_raises():
     """Verify clear error when a class has fewer samples than cv splits."""
     # Create a 4-sample dataset with only 2 samples of class 1 (cannot split into 3 folds)
     y = pd.Series([0, 0, 1, 1])

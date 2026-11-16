@@ -4,7 +4,7 @@ import pytest
 from reconciliacao.etl.cleaner import clean_pagamentos, clean_nfse
 
 
-def test_clean_pagamentos_normalizes_cnpj():
+def test_given_formatted_cnpjs_when_payments_are_cleaned_then_they_are_normalised():
     df = pd.DataFrame({
         "id_pagamento": ["PAG-1"],
         "cnpj_fornecedor": ["11.222.333/0001-81"],
@@ -17,7 +17,7 @@ def test_clean_pagamentos_normalizes_cnpj():
     assert result["cnpj_fornecedor"].iloc[0] == "11222333000181"
 
 
-def test_clean_pagamentos_validates_cnpj():
+def test_given_valid_and_invalid_cnpjs_when_payments_are_cleaned_then_each_is_flagged():
     df = pd.DataFrame({
         "id_pagamento": ["PAG-1", "PAG-2"],
         "cnpj_fornecedor": ["11222333000181", "11222333000182"],
@@ -30,7 +30,7 @@ def test_clean_pagamentos_validates_cnpj():
     assert result["cnpj_valid"].tolist() == [True, False]
 
 
-def test_clean_pagamentos_parses_dates():
+def test_given_date_strings_when_payments_are_cleaned_then_they_become_dates():
     df = pd.DataFrame({
         "id_pagamento": ["PAG-1"],
         "cnpj_fornecedor": ["11222333000181"],
@@ -43,7 +43,7 @@ def test_clean_pagamentos_parses_dates():
     assert result["data_pagamento"].iloc[0] == datetime.date(2024, 6, 15)
 
 
-def test_clean_pagamentos_parses_float_values():
+def test_given_value_strings_when_payments_are_cleaned_then_they_become_floats():
     df = pd.DataFrame({
         "id_pagamento": ["PAG-1"],
         "cnpj_fornecedor": ["11222333000181"],
@@ -56,7 +56,7 @@ def test_clean_pagamentos_parses_float_values():
     assert result["valor_pago"].iloc[0] == pytest.approx(1234.56)
 
 
-def test_clean_pagamentos_flags_duplicates():
+def test_given_repeated_payments_when_cleaned_then_duplicates_are_flagged():
     df = pd.DataFrame({
         "id_pagamento": ["PAG-1", "PAG-1"],
         "cnpj_fornecedor": ["11222333000181", "11222333000181"],
@@ -69,7 +69,7 @@ def test_clean_pagamentos_flags_duplicates():
     assert result["pagamento_duplicado"].all()
 
 
-def test_clean_nfse_parses_numeric_fields():
+def test_given_invoice_strings_when_cleaned_then_numeric_fields_are_parsed():
     df = pd.DataFrame({
         "nfse_numero": ["1"],
         "nfse_codigo_verificacao": ["ABC"],

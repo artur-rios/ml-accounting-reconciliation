@@ -91,7 +91,7 @@ In `fuzzy`, a record is *partially* conciliated when it falls within 4× the dat
 │   ├── superpowers/             # Design specs and implementation plans
 │   ├── discussao-limitacoes-contribuicoes.md
 │   └── glossary.md
-└── tests/                       # 140 tests, mirroring src/
+└── tests/                       # ~165 tests, mirroring src/
 ```
 
 ## Setup
@@ -234,7 +234,7 @@ In experiment 3 the label comes from generator ground truth rather than from a t
 
 ## Tests
 
-The suite has 140 tests. Three of them are marked `integration`: they run the pipeline and experiment 3 end to end on small configurations, writing only to temporary directories.
+The suite has about 165 tests, named `test_given_<context>_when_<action>_then_<outcome>`. Four of them are marked `integration`: they run the pipeline (both scenarios) and experiment 3 end to end on small configurations, writing only to temporary directories. Every random draw is seeded. `tests/conftest.py` caps joblib at one worker process for the run (`LOKY_MAX_CPU_COUNT=1`): the trainers search with `n_jobs=-1`, and one worker per core is gigabytes of memory for datasets of a few hundred rows. Tests that only need a fitted model use a one-point version of each hyperparameter grid (the `small_grids` fixture); the real grids are pinned in `tests/test_models/test_trainer.py`, and the end-to-end comparison test still searches them.
 
 ```bash
 pytest
@@ -245,7 +245,7 @@ pytest -m "not integration"
 ```
 
 ```bash
-pytest --cov=src/reconciliacao --cov-report=term-missing
+pytest --cov --cov-report=term-missing   # source and the 97% branch floor come from pyproject.toml
 ```
 
 ## Dependencies

@@ -3,7 +3,7 @@ import pandas as pd
 from reconciliacao.etl.labeler import label_records
 
 
-def test_exact_match_labels_conciliated(sample_pagamentos_clean, sample_nfse_clean):
+def test_given_an_exact_match_when_labelled_exactly_then_it_is_conciliated(sample_pagamentos_clean, sample_nfse_clean):
     # PAG-000001: CNPJ match, date match, value match → label 1
     result = label_records(sample_pagamentos_clean, sample_nfse_clean,
                            date_tolerance_days=0, value_tolerance_pct=0.0, n_classes=2)
@@ -11,7 +11,7 @@ def test_exact_match_labels_conciliated(sample_pagamentos_clean, sample_nfse_cle
     assert row["label"] == 1
 
 
-def test_exact_match_labels_date_mismatch_as_not_conciliated(sample_pagamentos_clean, sample_nfse_clean):
+def test_given_a_date_mismatch_when_labelled_exactly_then_it_is_not_conciliated(sample_pagamentos_clean, sample_nfse_clean):
     # PAG-000002: CNPJ match, date off by 5 days, value off → label 0
     result = label_records(sample_pagamentos_clean, sample_nfse_clean,
                            date_tolerance_days=0, value_tolerance_pct=0.0, n_classes=2)
@@ -19,7 +19,7 @@ def test_exact_match_labels_date_mismatch_as_not_conciliated(sample_pagamentos_c
     assert row["label"] == 0
 
 
-def test_fuzzy_match_labels_within_tolerance(sample_pagamentos_clean, sample_nfse_clean):
+def test_given_a_value_outside_tolerance_when_labelled_fuzzily_then_it_is_not_fully_conciliated(sample_pagamentos_clean, sample_nfse_clean):
     # PAG-000002: CNPJ match, 5-day tolerance, value is 2600 vs 2500 (4% off) → label 0 or 1
     result = label_records(sample_pagamentos_clean, sample_nfse_clean,
                            date_tolerance_days=5, value_tolerance_pct=2.0, n_classes=3)
@@ -28,7 +28,7 @@ def test_fuzzy_match_labels_within_tolerance(sample_pagamentos_clean, sample_nfs
     assert row["label"] in (0, 1)
 
 
-def test_fuzzy_match_fully_conciliated(sample_pagamentos_clean, sample_nfse_clean):
+def test_given_an_exact_match_when_labelled_fuzzily_then_it_is_fully_conciliated(sample_pagamentos_clean, sample_nfse_clean):
     # PAG-000001: CNPJ match, date exact, value exact → label 2
     result = label_records(sample_pagamentos_clean, sample_nfse_clean,
                            date_tolerance_days=5, value_tolerance_pct=2.0, n_classes=3)
@@ -36,7 +36,7 @@ def test_fuzzy_match_fully_conciliated(sample_pagamentos_clean, sample_nfse_clea
     assert row["label"] == 2
 
 
-def test_unmatched_cnpj_labeled_zero(sample_pagamentos_clean, sample_nfse_clean):
+def test_given_an_unmatched_cnpj_when_labelled_then_it_is_zero(sample_pagamentos_clean, sample_nfse_clean):
     # PAG-000003 has CNPJ 77888999000177 but NFS-e row 3 has 00000000000000 → no match → label 0
     result = label_records(sample_pagamentos_clean, sample_nfse_clean,
                            date_tolerance_days=0, value_tolerance_pct=0.0, n_classes=2)
@@ -44,7 +44,7 @@ def test_unmatched_cnpj_labeled_zero(sample_pagamentos_clean, sample_nfse_clean)
     assert row["label"] == 0
 
 
-def test_result_has_label_and_delta_columns(sample_pagamentos_clean, sample_nfse_clean):
+def test_given_records_when_labelled_then_the_label_and_delta_columns_exist(sample_pagamentos_clean, sample_nfse_clean):
     result = label_records(sample_pagamentos_clean, sample_nfse_clean,
                            date_tolerance_days=0, value_tolerance_pct=0.0, n_classes=2)
     assert "label" in result.columns
@@ -52,7 +52,7 @@ def test_result_has_label_and_delta_columns(sample_pagamentos_clean, sample_nfse
     assert "delta_valor_pct" in result.columns
 
 
-def test_merge_does_not_collide_cleaner_diagnostic_columns(sample_pagamentos_clean, sample_nfse_clean):
+def test_given_both_cleaners_diagnostics_when_merged_then_their_columns_do_not_collide(sample_pagamentos_clean, sample_nfse_clean):
     """Both cleaners used to emit a column called `is_duplicate`, so the join
     silently renamed them to `is_duplicate_x` and `is_duplicate_y` and shipped
     both into the persisted dataset, where neither name says which source it
@@ -68,7 +68,7 @@ def test_merge_does_not_collide_cleaner_diagnostic_columns(sample_pagamentos_cle
     assert "nfse_duplicada" in merged.columns
 
 
-def test_cnpj_join_fanout_is_visible_in_the_output(sample_pagamentos_clean, sample_nfse_clean):
+def test_given_a_shared_cnpj_when_joined_then_the_fanout_is_visible_in_the_output(sample_pagamentos_clean, sample_nfse_clean):
     """The join keys on the supplier registration number, which the generator
     does not guarantee to be unique among invoices. When two invoices carry the
     same number, one payment becomes two rows -- and, because the label is a
