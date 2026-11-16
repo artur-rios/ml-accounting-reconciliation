@@ -5,7 +5,7 @@ import pytest
 from reconciliacao.models.decision import choose_threshold, exception_metrics
 
 
-def test_chooses_threshold_that_meets_the_precision_floor():
+def test_given_a_reachable_floor_when_a_threshold_is_chosen_then_it_meets_the_floor():
     y = pd.Series([0, 0, 0, 1, 1, 1, 1, 1])
     proba = np.array([0.95, 0.90, 0.85, 0.40, 0.30, 0.20, 0.10, 0.05])
     limiar = choose_threshold(y, proba, min_precision=0.90)
@@ -14,13 +14,13 @@ def test_chooses_threshold_that_meets_the_precision_floor():
     assert metricas["precisao_excecao"] >= 0.90
 
 
-def test_returns_none_when_the_precision_floor_is_unreachable():
+def test_given_an_unreachable_floor_when_a_threshold_is_chosen_then_there_is_none():
     y = pd.Series([0, 1, 1, 1, 1, 1, 1, 1])
     proba = np.array([0.10, 0.95, 0.94, 0.93, 0.92, 0.91, 0.90, 0.89])
     assert choose_threshold(y, proba, min_precision=0.90) is None
 
 
-def test_maximises_recall_subject_to_the_constraint():
+def test_given_several_valid_thresholds_when_one_is_chosen_then_recall_is_maximised():
     y = pd.Series([0, 0, 0, 0, 1, 1, 1, 1])
     proba = np.array([0.99, 0.80, 0.70, 0.60, 0.20, 0.15, 0.10, 0.05])
     limiar = choose_threshold(y, proba, min_precision=0.90)
@@ -30,14 +30,14 @@ def test_maximises_recall_subject_to_the_constraint():
     assert metricas["precisao_excecao"] == pytest.approx(1.0)
 
 
-def test_referral_rate_is_the_flagged_fraction():
+def test_given_a_threshold_when_metrics_are_computed_then_the_referral_rate_is_the_flagged_fraction():
     y = pd.Series([0, 0, 1, 1, 1, 1, 1, 1])
     proba = np.array([0.99, 0.98, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10])
     metricas = exception_metrics(y, proba, threshold=0.50)
     assert metricas["taxa_encaminhamento"] == pytest.approx(2 / 8)
 
 
-def test_metrics_include_pr_auc_and_f1():
+def test_given_a_threshold_when_metrics_are_computed_then_pr_auc_and_f1_are_included():
     y = pd.Series([0, 0, 1, 1])
     proba = np.array([0.9, 0.8, 0.2, 0.1])
     metricas = exception_metrics(y, proba, threshold=0.5)
@@ -45,7 +45,7 @@ def test_metrics_include_pr_auc_and_f1():
     assert 0.0 <= metricas["f1_macro"] <= 1.0
 
 
-def test_precision_margin_tightens_the_validation_requirement():
+def test_given_a_precision_margin_when_a_threshold_is_chosen_then_the_requirement_tightens():
     """The margin exists to buy back the winner's curse: maximising recall
     over thousands of candidate cut points systematically selects a threshold
     whose validation precision clears the floor by luck. Requiring a margin
@@ -65,7 +65,7 @@ def test_precision_margin_tightens_the_validation_requirement():
     assert com_margem is None or com_margem >= sem_margem
 
 
-def test_exception_metrics_reports_the_confusion_cells():
+def test_given_a_threshold_when_metrics_are_computed_then_the_confusion_cells_are_reported():
     """The full matrix, not only the aggregates -- the study's own checklist
     item 7, counted with the exception (label 0) as the positive class."""
     y_true = pd.Series([0, 0, 0, 1, 1, 1, 1, 1])

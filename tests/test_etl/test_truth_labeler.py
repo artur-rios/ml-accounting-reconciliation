@@ -1,3 +1,4 @@
+import pytest
 import pandas as pd
 
 from reconciliacao.etl.truth_labeler import label_from_truth
@@ -66,7 +67,7 @@ def _fixtures():
     return pag, nfse
 
 
-def test_true_pair_is_labeled_one():
+def test_given_a_true_pair_when_labelled_from_truth_then_it_is_one():
     pag, nfse = _fixtures()
     verdade = pd.DataFrame({
         "id_pagamento": ["PAG-000001", "PAG-000002"],
@@ -77,7 +78,7 @@ def test_true_pair_is_labeled_one():
     assert out.loc[out["id_pagamento"] == "PAG-000001", "label"].iloc[0] == 1
 
 
-def test_label_ignores_perfect_deltas_when_truth_says_no_pair():
+def test_given_perfect_deltas_but_no_true_pair_when_labelled_then_it_is_zero():
     """PAG-000002 matches on date and value exactly, yet is not a true pair.
 
     This is the property the original experiment lacked: no combination of
@@ -95,7 +96,7 @@ def test_label_ignores_perfect_deltas_when_truth_says_no_pair():
     assert row["label"] == 0
 
 
-def test_every_payment_keeps_exactly_one_candidate_invoice():
+def test_given_payments_when_labelled_from_truth_then_each_keeps_exactly_one_candidate():
     pag, nfse = _fixtures()
     verdade = pd.DataFrame({
         "id_pagamento": ["PAG-000001", "PAG-000002"],
@@ -107,7 +108,7 @@ def test_every_payment_keeps_exactly_one_candidate_invoice():
     assert out["id_pagamento"].is_unique
 
 
-def test_truth_columns_are_not_leaked_into_the_output():
+def test_given_the_truth_table_when_labelled_then_its_columns_do_not_leak_into_the_output():
     pag, nfse = _fixtures()
     verdade = pd.DataFrame({
         "id_pagamento": ["PAG-000001", "PAG-000002"],
@@ -119,7 +120,7 @@ def test_truth_columns_are_not_leaked_into_the_output():
     assert "nfse_verdadeira" not in out.columns
 
 
-def test_true_pair_survives_real_csv_round_trip(tmp_path):
+def test_given_a_csv_round_trip_when_labelled_then_the_true_pair_survives(tmp_path):
     """A CSV round-trip lets pandas infer numeric dtypes for nfse_numero.
 
     A clean column becomes int64 ("000001" -> 1); a column with a blank
@@ -161,7 +162,7 @@ def test_true_pair_survives_real_csv_round_trip(tmp_path):
     assert out.loc[out["id_pagamento"] == "PAG-000001", "label"].iloc[0] == 1
 
 
-def test_true_pair_labeled_one_with_mixed_numeric_dtypes():
+def test_given_mixed_numeric_dtypes_when_labelled_then_the_true_pair_is_one():
     """Truth column float64 with NaN, candidate column int64: still labels 1."""
     pag, nfse = _fixtures()
     nfse = nfse.copy()
@@ -177,7 +178,7 @@ def test_true_pair_labeled_one_with_mixed_numeric_dtypes():
     assert out.loc[out["id_pagamento"] == "PAG-000001", "label"].iloc[0] == 1
 
 
-def test_non_pair_still_labeled_zero_with_mixed_numeric_dtypes():
+def test_given_mixed_numeric_dtypes_when_labelled_then_a_non_pair_is_still_zero():
     """The fix must not make everything match: non-pairs stay labeled 0."""
     pag, nfse = _fixtures()
     nfse = nfse.copy()
@@ -192,7 +193,7 @@ def test_non_pair_still_labeled_zero_with_mixed_numeric_dtypes():
     assert out.loc[out["id_pagamento"] == "PAG-000002", "label"].iloc[0] == 0
 
 
-def test_non_numeric_invoice_number_matches_correctly():
+def test_given_a_non_numeric_invoice_number_when_labelled_then_it_matches():
     """A non-digit invoice number must not be swallowed by the numeric branch."""
     pag, nfse = _fixtures_with_third_row()
     verdade = pd.DataFrame({
@@ -213,7 +214,7 @@ def test_non_numeric_invoice_number_matches_correctly():
     assert out_miss.loc[out_miss["id_pagamento"] == "PAG-000003", "label"].iloc[0] == 0
 
 
-def test_large_invoice_numbers_are_not_collapsed_by_float_precision():
+def test_given_large_invoice_numbers_when_labelled_then_float_precision_does_not_collapse_them():
     """Two distinct 18-digit invoice numbers must not canonicalise to the same key.
 
     float() only carries 53 bits of mantissa, so
@@ -242,7 +243,7 @@ def test_large_invoice_numbers_are_not_collapsed_by_float_precision():
     assert out.loc[out["id_pagamento"] == "PAG-000002", "label"].iloc[0] == 0
 
 
-def test_shared_supplier_still_yields_one_row_per_payment():
+def test_given_a_shared_supplier_when_labelled_then_there_is_one_row_per_payment():
     """A supplier with several invoices must not multiply rows.
 
     Joining on cnpj_fornecedor (the old approach) would produce a cross
@@ -284,3 +285,14 @@ def test_shared_supplier_still_yields_one_row_per_payment():
     assert out.set_index("id_pagamento")["label"].to_dict() == {
         "PAG-000001": 1, "PAG-000002": 0, "PAG-000003": 1,
     }
+
+
+@pytest.mark.parametrize("raw, key", [
+    ("000001", "1"), (" 1 ", "1"), (1, "1"), (1.0, "1"), ("1.0", "1"), ("1e3", "1000"), ("+7", "7"),
+    (None, ""), (float("nan"), ""), ("", ""), ("   ", ""), ("NaN", ""),
+    ("1.5", "1.5"), ("inf", "inf"), ("1e999", "1e999"), ("NF-12", "NF-12"),
+])
+def test_given_an_invoice_number_in_any_form_when_normalised_then_equal_numbers_share_one_key(raw, key):
+    from reconciliacao.etl.truth_labeler import _normalize_numero
+
+    assert _normalize_numero(pd.Series([raw], dtype=object)).iloc[0] == key

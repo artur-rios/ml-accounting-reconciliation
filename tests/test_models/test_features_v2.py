@@ -32,7 +32,7 @@ def _frame():
     })
 
 
-def test_retention_and_ratio_are_computed():
+def test_given_a_withholding_when_features_are_built_then_retention_and_ratio_are_computed():
     df = _frame()
     terms, global_term = fit_supplier_terms(df)
     X, y = build_features_v2(df, CFG, terms, global_term)
@@ -41,7 +41,7 @@ def test_retention_and_ratio_are_computed():
     assert X.loc[0, "valor_retido_brl"] == pytest.approx(150.00)
 
 
-def test_compatibility_flag_fires_for_legal_withholding():
+def test_given_a_legal_withholding_when_features_are_built_then_the_compatibility_flag_fires():
     df = _frame()
     terms, global_term = fit_supplier_terms(df)
     X, _ = build_features_v2(df, CFG, terms, global_term)
@@ -49,7 +49,7 @@ def test_compatibility_flag_fires_for_legal_withholding():
     assert X.loc[1, "compat_irrf_csrf"] == 1     # 6.15% on a 6000 invoice
 
 
-def test_csrf_threshold_flag_tracks_invoice_size():
+def test_given_invoice_sizes_when_features_are_built_then_the_csrf_flag_tracks_the_threshold():
     df = _frame()
     terms, global_term = fit_supplier_terms(df)
     X, _ = build_features_v2(df, CFG, terms, global_term)
@@ -57,7 +57,7 @@ def test_csrf_threshold_flag_tracks_invoice_size():
     assert X.loc[2, "acima_limite_csrf"] == 0    # 1000 < 5000
 
 
-def test_municipality_flag_compares_cost_centre_to_invoice():
+def test_given_cost_centre_and_invoice_municipalities_when_features_are_built_then_the_flag_compares_them():
     df = _frame()
     terms, global_term = fit_supplier_terms(df)
     X, _ = build_features_v2(df, CFG, terms, global_term)
@@ -65,7 +65,7 @@ def test_municipality_flag_compares_cost_centre_to_invoice():
     assert X.loc[1, "mesmo_municipio"] == 0
 
 
-def test_supplier_terms_are_fitted_on_training_data_only():
+def test_given_training_rows_when_supplier_terms_are_fitted_then_only_they_count():
     """A supplier unseen in training falls back to the global training median."""
     df = _frame()
     train = df[df["cnpj_fornecedor"] == "11222333000181"]
@@ -77,7 +77,7 @@ def test_supplier_terms_are_fitted_on_training_data_only():
     assert X.loc[2, "desvio_prazo_fornecedor"] == pytest.approx(0.0 - global_term)
 
 
-def test_no_feature_is_the_label():
+def test_given_built_features_when_inspected_then_no_column_is_the_label():
     df = _frame()
     terms, global_term = fit_supplier_terms(df)
     X, y = build_features_v2(df, CFG, terms, global_term)
@@ -86,14 +86,14 @@ def test_no_feature_is_the_label():
     assert list(y) == [1, 1, 0]
 
 
-def test_text_similarity_is_higher_for_matching_descriptions():
+def test_given_matching_descriptions_when_features_are_built_then_similarity_is_higher():
     df = _frame()
     terms, global_term = fit_supplier_terms(df)
     X, _ = build_features_v2(df, CFG, terms, global_term)
     assert X.loc[0, "similaridade_descricao"] > X.loc[2, "similaridade_descricao"]
 
 
-def test_nonpositive_valor_servicos_raises_with_offending_ids():
+def test_given_a_nonpositive_service_value_when_features_are_built_then_it_raises_naming_the_rows():
     """A zero/missing nfse_valor_servicos means an upstream invariant broke;
     build_features_v2 must fail loudly rather than divide into inf/NaN."""
     df = _frame()
@@ -109,7 +109,7 @@ def test_nonpositive_valor_servicos_raises_with_offending_ids():
     assert "PAG-000003" in message
 
 
-def test_delta_dias_handles_raw_date_objects_and_iso_strings():
+def test_given_dates_as_objects_or_iso_strings_when_features_are_built_then_delta_dias_agrees():
     """data_pagamento arrives as datetime.date while nfse_data_emissao
     arrives as an ISO-8601 string; both must resolve to the same delta."""
     df = _frame()
@@ -131,7 +131,7 @@ def test_delta_dias_handles_raw_date_objects_and_iso_strings():
     assert X.loc[2, "delta_dias"] == pytest.approx(0.0)
 
 
-def test_fit_supplier_terms_rejects_empty_training_frame():
+def test_given_an_empty_training_frame_when_supplier_terms_are_fitted_then_it_raises():
     """An empty training partition is a programming error in the split,
     not a legitimate scenario: delta.median() on it would be NaN and
     would silently poison desvio_prazo_fornecedor for every row."""
@@ -140,9 +140,17 @@ def test_fit_supplier_terms_rejects_empty_training_frame():
         fit_supplier_terms(empty)
 
 
-def test_fit_supplier_terms_handles_single_row_training_frame():
+def test_given_a_single_training_row_when_supplier_terms_are_fitted_then_it_works():
     """A single-row training frame is legitimate and must work."""
     single = _frame().iloc[[0]]
     terms, global_term = fit_supplier_terms(single)
     assert terms == {"11222333000181": 30.0}
     assert global_term == pytest.approx(30.0)
+
+
+def test_given_descriptions_with_no_words_when_features_are_built_then_similarity_is_zero():
+    """TfidfVectorizer refuses an empty vocabulary; the feature falls back to 0."""
+    df = _frame().assign(descricao=["", "", ""], nfse_discriminacao=["", None, ""])
+    terms, global_term = fit_supplier_terms(df)
+    X, _y = build_features_v2(df, CFG, terms, global_term)
+    assert (X["similaridade_descricao"] == 0.0).all()

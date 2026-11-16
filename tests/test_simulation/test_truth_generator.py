@@ -6,7 +6,7 @@ from reconciliacao.simulation.retentions import legal_combos, matches_any
 from reconciliacao.simulation.truth_generator import generate_comparison_dataset
 
 
-def test_truth_table_has_one_row_per_payment(comparison_config):
+def test_given_a_config_when_generated_then_the_truth_table_has_one_row_per_payment(comparison_config):
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
     assert len(pag) == comparison_config["n_records"]
     assert len(nfse) == comparison_config["n_records"]
@@ -14,7 +14,7 @@ def test_truth_table_has_one_row_per_payment(comparison_config):
     assert set(verdade["id_pagamento"]) == set(pag["id_pagamento"])
 
 
-def test_suppliers_have_a_real_payment_history(comparison_config):
+def test_given_a_config_when_generated_then_suppliers_have_several_payments(comparison_config):
     """A supplier pool smaller than n_records means several payments per
     supplier -- the regression test for the CNPJ-per-payment defect that
     zeroed desvio_prazo_fornecedor on every training row."""
@@ -30,21 +30,21 @@ def test_suppliers_have_a_real_payment_history(comparison_config):
     assert counts.mean() == pytest.approx(payments_per_supplier, abs=1)
 
 
-def test_match_rate_is_respected(comparison_config):
+def test_given_a_match_rate_when_generated_then_it_is_respected(comparison_config):
     _, _, verdade = generate_comparison_dataset(comparison_config, seed=42)
     matched = (verdade["nfse_numero"] != "").sum()
     expected = comparison_config["n_records"] * comparison_config["match_rate"]
     assert matched == pytest.approx(expected, abs=2)
 
 
-def test_at_least_thirty_percent_of_negatives_are_hard(comparison_config):
+def test_given_a_hard_negative_rate_when_generated_then_at_least_that_share_is_hard(comparison_config):
     _, _, verdade = generate_comparison_dataset(comparison_config, seed=42)
     negatives = verdade[verdade["nfse_numero"] == ""]
     hard = (negatives["tipo_negativo"] == "hard").sum()
     assert hard / len(negatives) >= comparison_config["hard_negative_rate"] - 0.01
 
 
-def test_hard_negatives_have_a_legitimate_value_ratio(comparison_config):
+def test_given_hard_negatives_when_generated_then_their_value_ratio_is_legitimate(comparison_config):
     """A hard negative is precisely one the value ratio cannot resolve."""
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
     merged = pag.merge(
@@ -63,7 +63,7 @@ def test_hard_negatives_have_a_legitimate_value_ratio(comparison_config):
         assert matches_any(retencao, combos, tol_pp=0.5)
 
 
-def test_soft_negatives_have_an_illegitimate_value_ratio(comparison_config):
+def test_given_soft_negatives_when_generated_then_their_value_ratio_is_illegitimate(comparison_config):
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
     merged = pag.merge(
         nfse, left_on="nfse_numero_candidata", right_on="nfse_numero"
@@ -84,7 +84,7 @@ def test_soft_negatives_have_an_illegitimate_value_ratio(comparison_config):
     assert off_band == len(soft)
 
 
-def test_true_pairs_sometimes_break_the_supplier_term(comparison_config):
+def test_given_true_pairs_when_generated_then_some_break_the_supplier_term(comparison_config):
     """No evidence dimension may separate the classes on its own."""
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
     merged = pag.merge(nfse, left_on="nfse_numero_candidata", right_on="nfse_numero").merge(
@@ -98,7 +98,7 @@ def test_true_pairs_sometimes_break_the_supplier_term(comparison_config):
     assert not delta.isin(comparison_config["payment_terms_days"]).all()
 
 
-def test_true_pairs_sometimes_sit_in_a_different_municipality(comparison_config):
+def test_given_true_pairs_when_generated_then_some_sit_in_another_municipality(comparison_config):
     """No evidence dimension may separate the classes on its own (municipio)."""
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
     merged = pag.merge(nfse, left_on="nfse_numero_candidata", right_on="nfse_numero").merge(
@@ -119,7 +119,7 @@ def _tokens(texto: str) -> set[str]:
     return {t.lower() for t in texto.split() if len(t) > 3}
 
 
-def test_true_pairs_sometimes_carry_an_unrelated_description(comparison_config):
+def test_given_true_pairs_when_generated_then_some_carry_an_unrelated_description(comparison_config):
     """Guards F1: description must not be a perfect predictor of the label."""
     pag, nfse, verdade = generate_comparison_dataset(comparison_config, seed=42)
     merged = pag.merge(nfse, left_on="nfse_numero_candidata", right_on="nfse_numero").merge(
@@ -134,7 +134,7 @@ def test_true_pairs_sometimes_carry_an_unrelated_description(comparison_config):
     assert not related.all()
 
 
-def test_negatives_corrupt_a_varying_subset_of_dimensions(comparison_config):
+def test_given_negatives_when_generated_then_they_corrupt_a_varying_subset_of_dimensions(comparison_config):
     """Guards the random subset: the corrupted-dimension pattern must vary,
     not sit fixed on a single dimension (e.g. always just "texto").
     """
@@ -162,7 +162,7 @@ def test_negatives_corrupt_a_varying_subset_of_dimensions(comparison_config):
     assert len(patterns) > 1
 
 
-def test_delta_days_overlap_between_classes(comparison_config):
+def test_given_both_classes_when_generated_then_their_delta_days_overlap(comparison_config):
     """Guards F4: true pairs and negatives draw atypical terms from the same
     shift_range, so delta_dias must not split into class-exclusive values.
     """
@@ -185,13 +185,13 @@ def test_delta_days_overlap_between_classes(comparison_config):
     assert len(overlap) >= 0.3 * min(len(positive_days), len(negative_days))
 
 
-def test_generation_is_deterministic(comparison_config):
+def test_given_the_same_seed_when_generated_twice_then_the_data_is_identical(comparison_config):
     a = generate_comparison_dataset(comparison_config, seed=7)[0]
     b = generate_comparison_dataset(comparison_config, seed=7)[0]
     pd.testing.assert_frame_equal(a, b)
 
 
-def test_different_seeds_produce_different_data(comparison_config):
+def test_given_different_seeds_when_generated_then_the_data_differs(comparison_config):
     a = generate_comparison_dataset(comparison_config, seed=1)[0]
     b = generate_comparison_dataset(comparison_config, seed=2)[0]
     assert not a["valor_pago"].equals(b["valor_pago"])

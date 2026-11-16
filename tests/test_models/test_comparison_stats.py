@@ -12,7 +12,7 @@ def _per_seed(values: dict[str, list[float]]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_produces_one_row_per_pair():
+def test_given_three_algorithms_when_compared_pairwise_then_there_is_one_row_per_pair():
     df = _per_seed({
         "random_forest": [0.80] * 10,
         "svm": [0.70] * 10,
@@ -26,7 +26,7 @@ def test_produces_one_row_per_pair():
     }
 
 
-def test_detects_a_consistent_difference():
+def test_given_a_consistent_difference_when_compared_then_it_is_significant():
     df = _per_seed({
         "random_forest": [0.80, 0.81, 0.79, 0.82, 0.80, 0.83, 0.78, 0.81, 0.80, 0.82],
         "svm": [0.70, 0.71, 0.69, 0.72, 0.70, 0.73, 0.68, 0.71, 0.70, 0.72],
@@ -39,7 +39,7 @@ def test_detects_a_consistent_difference():
     assert bool(row["significant"]) is True
 
 
-def test_reports_no_significance_for_identical_performance():
+def test_given_identical_performance_when_compared_then_nothing_is_significant():
     df = _per_seed({
         "random_forest": [0.80, 0.70, 0.75, 0.82, 0.68, 0.79, 0.71, 0.77, 0.73, 0.76],
         "svm": [0.80, 0.70, 0.75, 0.82, 0.68, 0.79, 0.71, 0.77, 0.73, 0.76],
@@ -51,7 +51,7 @@ def test_reports_no_significance_for_identical_performance():
     assert bool(row["significant"]) is False
 
 
-def test_holm_correction_is_no_smaller_than_the_raw_p():
+def test_given_several_comparisons_when_holm_corrected_then_no_p_value_shrinks():
     df = _per_seed({
         "random_forest": [0.80, 0.81, 0.79, 0.82, 0.80, 0.83, 0.78, 0.81, 0.80, 0.82],
         "svm": [0.70, 0.71, 0.69, 0.72, 0.70, 0.73, 0.68, 0.71, 0.70, 0.72],
@@ -62,7 +62,7 @@ def test_holm_correction_is_no_smaller_than_the_raw_p():
     assert (out["p_holm"] <= 1.0).all()
 
 
-def test_raises_on_missing_seed_algorithm_combination():
+def test_given_a_missing_seed_algorithm_cell_when_compared_then_it_raises_naming_it():
     """Missing (seed, algorithm) cells after pivot must raise ValueError naming the missing data."""
     # Create a DataFrame with missing data: logistic_regression has no seed 5
     df = _per_seed({
@@ -80,7 +80,7 @@ def test_raises_on_missing_seed_algorithm_combination():
     assert "seed=" in error_msg
 
 
-def test_complete_frame_does_not_raise():
+def test_given_a_complete_frame_when_compared_then_it_does_not_raise():
     """A complete (seed, algorithm) frame with no missing cells must not raise."""
     df = _per_seed({
         "random_forest": [0.80, 0.81, 0.79, 0.82, 0.80, 0.83, 0.78, 0.81, 0.80, 0.82],
@@ -93,7 +93,7 @@ def test_complete_frame_does_not_raise():
     assert not out.isnull().any().any()
 
 
-def test_friedman_omnibus_rejects_when_one_algorithm_always_wins():
+def test_given_one_algorithm_always_winning_when_friedman_runs_then_it_rejects():
     """The omnibus step: a consistent ordering across seeds must reject the
     global null before any pairwise table is read."""
     rows = []
@@ -112,7 +112,7 @@ def test_friedman_omnibus_rejects_when_one_algorithm_always_wins():
     assert resultado["rank_medio_c"] == pytest.approx(3.0)
 
 
-def test_friedman_omnibus_does_not_reject_without_a_consistent_ordering():
+def test_given_no_consistent_ordering_when_friedman_runs_then_it_does_not_reject():
     """No stable ordering means no licence to read the pairwise table."""
     valores = {
         "a": [0.80, 0.90, 0.85, 0.83, 0.88, 0.81, 0.89, 0.84, 0.86, 0.82],
@@ -128,7 +128,7 @@ def test_friedman_omnibus_does_not_reject_without_a_consistent_ordering():
     assert resultado["significant"] is False
 
 
-def test_friedman_omnibus_rejects_incomplete_pairings():
+def test_given_incomplete_pairings_when_friedman_runs_then_it_raises():
     """Same completeness contract as the pairwise test: a missing cell would
     silently unbalance a paired test rather than fail it."""
     rows = [

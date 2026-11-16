@@ -12,12 +12,12 @@ from reconciliacao.simulation.excel_generator import (
 )
 
 
-def test_generate_payment_records_count():
+def test_given_a_count_when_payments_are_generated_then_that_many_come_back():
     df = generate_payment_records(n=100, seed=42)
     assert len(df) == 100
 
 
-def test_generate_payment_records_schema():
+def test_given_generated_payments_when_inspected_then_the_columns_match_the_schema():
     df = generate_payment_records(n=10, seed=42)
     assert set(df.columns) == {
         "id_pagamento", "cnpj_fornecedor", "data_pagamento",
@@ -25,28 +25,28 @@ def test_generate_payment_records_schema():
     }
 
 
-def test_generate_payment_records_unique_cnpj():
+def test_given_generated_payments_when_inspected_then_the_cnpjs_are_unique():
     df = generate_payment_records(n=100, seed=42)
     assert df["cnpj_fornecedor"].nunique() == 100
 
 
-def test_generate_payment_records_cnpj_length():
+def test_given_generated_payments_when_inspected_then_each_cnpj_has_14_digits():
     df = generate_payment_records(n=50, seed=42)
     assert df["cnpj_fornecedor"].str.len().eq(14).all()
 
 
-def test_generate_payment_records_reproducible():
+def test_given_the_same_seed_when_payments_are_generated_twice_then_they_are_identical():
     df1 = generate_payment_records(n=20, seed=42)
     df2 = generate_payment_records(n=20, seed=42)
     assert df1.equals(df2)
 
 
-def test_generate_payment_records_positive_values():
+def test_given_generated_payments_when_inspected_then_every_value_is_positive():
     df = generate_payment_records(n=50, seed=42)
     assert (df["valor_pago"] > 0).all()
 
 
-def test_write_excel_creates_readable_file(tmp_path):
+def test_given_payments_when_written_to_excel_then_the_file_reads_back(tmp_path):
     df = generate_payment_records(n=10, seed=42)
     out = tmp_path / "pagamentos.xlsx"
     write_excel(df, out)
@@ -71,7 +71,7 @@ def _generate_in_subprocess(hash_seed: str) -> list[str]:
     return out.stdout.split()
 
 
-def test_generate_payment_records_reproducible_across_processes():
+def test_given_different_hash_seeds_when_payments_are_generated_then_they_are_identical():
     """Regression test for the defect the in-process test could not see.
 
     `test_generate_payment_records_reproducible` calls the generator twice in
@@ -85,7 +85,7 @@ def test_generate_payment_records_reproducible_across_processes():
     assert _generate_in_subprocess("0") == _generate_in_subprocess("12345")
 
 
-def test_generate_payment_records_dates_do_not_depend_on_the_clock():
+def test_given_a_reference_date_when_payments_are_generated_then_dates_do_not_depend_on_the_clock():
     """The window was anchored on `today`, so the simulated ledger slid
     forward every day it was regenerated. It is pinned to a reference date."""
     reference = datetime.date(2020, 3, 1)

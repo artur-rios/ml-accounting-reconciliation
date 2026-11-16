@@ -21,12 +21,12 @@ def xml_file(tmp_path):
     return path
 
 
-def test_load_pagamentos_count(excel_file):
+def test_given_a_payments_workbook_when_loaded_then_every_row_is_read(excel_file):
     df = load_pagamentos(excel_file)
     assert len(df) == 20
 
 
-def test_load_pagamentos_schema(excel_file):
+def test_given_a_payments_workbook_when_loaded_then_the_columns_match_the_schema(excel_file):
     df = load_pagamentos(excel_file)
     assert set(df.columns) == {
         "id_pagamento", "cnpj_fornecedor", "data_pagamento",
@@ -34,12 +34,12 @@ def test_load_pagamentos_schema(excel_file):
     }
 
 
-def test_load_nfse_count(xml_file):
+def test_given_an_invoice_xml_when_loaded_then_every_invoice_is_read(xml_file):
     df = load_nfse(xml_file)
     assert len(df) == 20
 
 
-def test_load_nfse_schema(xml_file):
+def test_given_an_invoice_xml_when_loaded_then_the_columns_match_the_schema(xml_file):
     df = load_nfse(xml_file)
     expected = {
         "nfse_numero", "nfse_codigo_verificacao", "nfse_data_emissao",
@@ -51,7 +51,7 @@ def test_load_nfse_schema(xml_file):
     assert expected.issubset(set(df.columns))
 
 
-def test_load_nfse_cnpj_field_populated(xml_file):
+def test_given_an_invoice_xml_when_loaded_then_the_provider_cnpj_is_populated(xml_file):
     df = load_nfse(xml_file)
     assert df["nfse_cnpj_prestador"].notna().all()
     assert (df["nfse_cnpj_prestador"].str.len() > 0).all()

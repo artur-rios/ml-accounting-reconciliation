@@ -19,12 +19,12 @@ def sample_pagamentos():
     })
 
 
-def test_generate_nfse_count(sample_pagamentos):
+def test_given_payments_when_invoices_are_generated_then_there_is_one_invoice_per_payment(sample_pagamentos):
     df = generate_nfse(sample_pagamentos, conciliation_rate=0.70, seed=42)
     assert len(df) == len(sample_pagamentos)
 
 
-def test_generate_nfse_schema(sample_pagamentos):
+def test_given_generated_invoices_when_inspected_then_the_columns_match_the_schema(sample_pagamentos):
     df = generate_nfse(sample_pagamentos, conciliation_rate=0.70, seed=42)
     expected_cols = {
         "nfse_numero", "nfse_codigo_verificacao", "nfse_data_emissao",
@@ -36,13 +36,13 @@ def test_generate_nfse_schema(sample_pagamentos):
     assert expected_cols.issubset(set(df.columns))
 
 
-def test_generate_nfse_reproducible(sample_pagamentos):
+def test_given_the_same_seed_when_invoices_are_generated_twice_then_they_are_identical(sample_pagamentos):
     df1 = generate_nfse(sample_pagamentos, conciliation_rate=0.70, seed=42)
     df2 = generate_nfse(sample_pagamentos, conciliation_rate=0.70, seed=42)
     assert df1.equals(df2)
 
 
-def test_write_xml_creates_valid_abrasf_file(sample_pagamentos, tmp_path):
+def test_given_invoices_when_written_to_xml_then_the_file_is_valid_abrasf(sample_pagamentos, tmp_path):
     df = generate_nfse(sample_pagamentos, conciliation_rate=0.70, seed=42)
     out = tmp_path / "nfse.xml"
     write_xml(df, out)
@@ -53,7 +53,7 @@ def test_write_xml_creates_valid_abrasf_file(sample_pagamentos, tmp_path):
     assert len(comps) == len(sample_pagamentos)
 
 
-def test_write_xml_contains_cnpj(sample_pagamentos, tmp_path):
+def test_given_invoices_when_written_to_xml_then_the_cnpjs_are_in_it(sample_pagamentos, tmp_path):
     df = generate_nfse(sample_pagamentos, conciliation_rate=1.0, seed=42)
     out = tmp_path / "nfse.xml"
     write_xml(df, out)
@@ -63,7 +63,7 @@ def test_write_xml_contains_cnpj(sample_pagamentos, tmp_path):
     assert len(cnpjs) == len(sample_pagamentos)
 
 
-def test_generate_nfse_injects_mismatches(sample_pagamentos):
+def test_given_payments_when_invoices_are_generated_then_mismatches_are_injected(sample_pagamentos):
     # With conciliation_rate=0.0, ALL records should be mismatched
     # so no NFS-e CNPJ should match its source payment CNPJ
     df = generate_nfse(sample_pagamentos, conciliation_rate=0.0, seed=42)

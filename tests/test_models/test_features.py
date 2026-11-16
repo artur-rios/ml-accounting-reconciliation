@@ -26,36 +26,43 @@ def sample_merged():
     })
 
 
-def test_build_features_returns_dataframe_and_series(sample_merged):
+def test_given_merged_records_when_features_are_built_then_a_frame_and_a_series_come_back(sample_merged):
     X, y = build_features(sample_merged)
     assert isinstance(X, pd.DataFrame)
     assert isinstance(y, pd.Series)
 
 
-def test_build_features_row_count(sample_merged):
+def test_given_merged_records_when_features_are_built_then_there_is_one_row_per_record(sample_merged):
     X, y = build_features(sample_merged)
     assert len(X) == len(sample_merged)
     assert len(y) == len(sample_merged)
 
 
-def test_build_features_no_nan(sample_merged):
+def test_given_missing_values_when_features_are_built_then_none_is_nan(sample_merged):
     X, y = build_features(sample_merged)
     assert not X.isna().any().any()
     assert not y.isna().any()
 
 
-def test_build_features_expected_columns(sample_merged):
+def test_given_merged_records_when_features_are_built_then_the_expected_columns_exist(sample_merged):
     X, _ = build_features(sample_merged)
     expected = {"delta_days", "delta_valor_pct", "valor_pago", "nfse_valor_iss",
                 "nfse_aliquota", "cnpj_match", "descricao_similarity"}
     assert expected.issubset(set(X.columns))
 
 
-def test_build_features_cnpj_match_flag(sample_merged):
+def test_given_a_missing_cnpj_when_features_are_built_then_the_match_flag_is_zero(sample_merged):
     X, _ = build_features(sample_merged)
     assert X["cnpj_match"].tolist() == [1, 1, 0]
 
 
-def test_build_features_labels_match_input(sample_merged):
+def test_given_merged_records_when_features_are_built_then_the_labels_match_the_input(sample_merged):
     _, y = build_features(sample_merged)
     assert y.tolist() == [2, 0, 0]
+
+
+def test_given_descriptions_with_no_words_when_features_are_built_then_similarity_is_zero(sample_merged):
+    """TfidfVectorizer refuses an empty vocabulary; the feature falls back to 0."""
+    df = sample_merged.assign(descricao=["", "", ""], nfse_discriminacao=[None, "", None])
+    X, _y = build_features(df)
+    assert (X["descricao_similarity"] == 0.0).all()
